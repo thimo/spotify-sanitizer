@@ -1,8 +1,9 @@
 # spotify-sanitizer — project guide for Claude Code
 
-Public CLI (MIT, Thimo Jansen) that tidies a Spotify "Liked Songs" library:
-dedup, drop unplayable tracks, and suggest completing partially-liked albums.
-Ruby, **standard library only** — no runtime gems. Started 2026-06-25.
+A native macOS app (MIT, Thimo Jansen) that tidies a Spotify "Liked Songs"
+library: dedup, drop unplayable tracks, and suggest completing partially-liked
+albums. Self-contained SwiftUI + Swift Package Manager, no Xcode required to
+build. Started 2026-06-25; ported from a Ruby CLI to native Swift on 2026-06-26.
 
 This is a **public repo**. Code, comments, and commits are world-readable —
 keep them clean and free of personal data or secrets.
@@ -11,77 +12,97 @@ keep them clean and free of personal data or secrets.
 
 The whole safety model is the two-phase split. Do not blur it.
 
-- `scan` **must never** write to Spotify. It only reads the library and emits a
-  reviewable plan (`.plan.json` + `.plan.txt`).
-- `apply` is the *only* path that mutates the library, and it must always write a
-  reversal log so `undo` can revert it.
+- **Scan** only reads the library and builds a reviewable `Plan` in memory.
+- **Apply** is the *only* path that mutates the library, and it always writes a
+  reversal log so **Undo** can revert it.
 
 If you add a feature, decide which side of that line it sits on and keep it there.
 
 ## Architecture
 
 ```
-bin/spotify-sanitizer        entry point → CLI.start
-lib/spotify_sanitizer/
-  cli.rb        subcommand dispatch + option parsing (login/scan/apply/undo/status)
-  config.rb     ~/.config/spotify-sanitizer/ — client_id + token cache, paths
-  auth.rb       OAuth Authorization Code + PKCE; loopback redirect catcher; refresh
-  client.rb     Web API over net/http: bearer, pagination (each_page), 429 backoff
-  library.rb    fetch liked tracks + album tracklists → Track objects
-  track.rb      flattened track; skit? heuristic; fuzzy_key for dedup clustering
-  analyzer.rb   THE BRAIN — turns tracks into a Plan. Tunable knobs in DEFAULTS.
-  plan.rb       the reviewable artifact: to_h/save_json + to_text
-  apply.rb      executes a plan; writes reversal log; undo inverts it
+Package.swift                Swift Package Manager manifest (3 targets)
+Sources/
+  SanitizerKit/              the engine — no UI. Only `Engine` is public.
+    Config.swift             ~/.config/spotify-sanitizer — client_id + token cache
+    Auth.swift               OAuth Authorization Code + PKCE; NWListener loopback catcher; refresh
+    Client.swift             Web API over URLSession: bearer, pagination, 429 fail-fast
+    Library.swift            fetch liked tracks + album tracklists + ISRC search
+    Track.swift              flattened track; skit?; fuzzyKey for dedup; artwork + spotify url
+    Analyzer.swift           THE BRAIN — turns tracks into a Plan. Tunable knobs in Options.
+    Apply.swift              executes a plan; writes reversal log; undo inverts it
+    Plan.swift               the reviewable artifact + Card (display record)
+    Engine.swift             public façade: login / scan / apply / undo
+    Concurrency.swift        boundedMap — bounded-parallel fetch helper
+    Progress.swift           ScanProgress for the UI
+    Log.swift                file logging to logs/app.log (+ os.Logger), self-trimming
+    SelfTest.swift           in-Kit analyzer tests (XCTest needs full Xcode, absent)
+  SpotifySanitizer/          the SwiftUI app — thin front-end over Engine
+    App.swift, AppModel.swift, ContentView.swift
+  sanitizer-verify/          headless runner: --selftest, or a live scan
+build-app.sh                 assembles a double-clickable .app around the release binary
 ```
 
-Data flow: `Library` → `[Track]` → `Analyzer#build_plan` → `Plan` →
-(user reviews) → `Apply#run`.
+Data flow: `Engine.scan` → `Library` → `[Track]` → `Analyzer.buildPlan` → `Plan`
+→ (user reviews/unticks in the UI) → `Engine.apply`.
 
 ## The heuristics live in one place
 
-`Analyzer::DEFAULTS` and the keeper-preference logic in `Analyzer#rank` /
-`#compare_versions` are the only "opinionated" code. When tuning behavior, that's
-where to look — not scattered across modules.
+`Analyzer.Options` and the keeper-preference logic in `Analyzer.rankKey` /
+`duplicateReason` are the only "opinionated" code. When tuning behavior, that's
+where to look.
 
-- **Keeper preference** (which copy of a duplicate to keep): playable > explicit >
-  album-type (album > single > compilation) > earliest `added_at`.
-- **Dedup clustering**: `Track#fuzzy_key` — normalized artist + title (remaster/
-  version cruft stripped) + coarse duration bucket. Spotify track IDs are always
-  unique, so naïve ID-matching finds nothing; clustering is the point.
-- **Skits**: `Track#skit?` — short or titled skit/interlude/intro/outro/etc.
-  Excluded from album-completion math, never proposed for addition. This is what
-  makes "deliberately dropped the junk" not trigger a nag.
-- **Album completion** is always a *suggestion* in the plan, never automatic —
-  the user may have dropped a full-length song on purpose.
+- **Keeper preference**: playable > explicit > album-type (album>single>compilation)
+  > earliest `addedAt`.
+- **Dedup clustering**: `Track.fuzzyKey` — normalized artist + title (remaster/
+  version cruft stripped) + coarse duration bucket. Track IDs are always unique,
+  so clustering is the point.
+- **Skits**: `Track.isSkit` — short or titled skit/interlude/etc. Excluded from
+  album-completion math, never proposed for addition.
+- **Album completion** is always a suggestion, never automatic.
+- **ISRC alternatives** (`Library.findAlternative`, opt-in): match on ISRC **and**
+  duration (±3s) — Spotify's catalog has recycled ISRCs, so duration guards them.
 
-These are first-guess values. Expect to tune them against a real library.
+## Spotify gotchas (learned the hard way against the live API)
+
+- **Bring-your-own Client ID is mandatory.** Spotify caps a shared app at 5
+  manually-allowlisted users unless you're a 250k-MAU business (Extended Quota,
+  ~6-week review). So each user registers their own free app.
+- **Search `limit` max is 10**, not the documented 50 (>10 → 400).
+- **`market=from_token` on /search needs the `user-read-private` scope** (it works
+  on /me/tracks without it). All three scopes are requested at login.
+- **429 Retry-After is in seconds and can be hours.** Don't sleep on long ones —
+  `Client` auto-retries cool-downs ≤90s and throws `rateLimited` otherwise.
+  Avoid hammering the API with repeated full scans while developing.
 
 ## Tests
 
 ```sh
-ruby test/test_analyzer.rb        # pure analyzer logic, no network
+swift run sanitizer-verify --selftest   # pure analyzer checks, no network
+swift run sanitizer-verify              # live scan; prints plan stats + timing
 ```
 
-Analyzer tests use `Factory.saved(...)` to build API-shaped hashes — extend that
-factory rather than mocking HTTP. Auth/Client/Library are network-bound; keep
-logic testable by pushing decisions into `Analyzer`/`Track` (pure) and out of the
-network layer.
+Self-tests live in `SelfTest.swift` (not XCTest — XCTest needs full Xcode, which
+isn't installed here). Keep logic testable by pushing decisions into
+`Analyzer`/`Track` (pure) and out of the network layer; the analyzer takes a
+`LibraryProviding` so the library can be stubbed.
 
 ## Conventions
 
-- Ruby stdlib only at runtime (`net/http`, `json`, `socket`, `securerandom`,
-  `digest`, `set`). Don't add a runtime gem dependency without a real reason.
-- `# frozen_string_literal: true` on every file.
+- Swift toolchain only (Command Line Tools is enough). SwiftUI + Foundation +
+  Network + CryptoKit + OSLog from the SDK; no third-party packages.
+- `Engine` is the only public type in `SanitizerKit`; keep the rest internal.
 - Commit author `thimo@defrog.nl`, no `Co-Authored-By` trailer. Commit only when
   asked; **never push** — Thimo controls all pushes.
-- Never commit a plan/log or anything containing the user's library data
-  (`.gitignore` already excludes `plans/`, `logs/`, `*.plan.*`).
+- Never commit anything containing the user's library data (`.gitignore` excludes
+  `plans/`, `logs/`).
+- Build/verify after changes: `swift build` and `sanitizer-verify --selftest`.
+  Don't run live scans gratuitously — see the 429 note above.
 
 ## Status / next steps
 
-- Scaffold complete, analyzer tests green, CLI runs.
-- Not yet run against a real library — needs a Spotify app (Client ID) +
-  `login`. First real `scan` is the moment to validate the heuristic knobs.
-- Reachable but unproven against the live API: `auth.rb`, `client.rb`,
-  `library.rb`, `apply.rb`. The PKCE flow and pagination are written but
-  untested end-to-end.
+- Native Swift port complete; engine verified at parity with the old Ruby output
+  (3331 tracks → 166 dup, 53 unplayable, 145 additions, 1139 albums).
+- Open polish: app icon + code signing (currently generic icon, unsigned);
+  offset-based parallel library fetch (the page-by-page liked-songs fetch is the
+  remaining sequential floor) — but test it gently to avoid rate limits.

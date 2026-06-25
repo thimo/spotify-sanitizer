@@ -1,12 +1,16 @@
 # spotify-sanitizer
 
-Obsessively tidy your Spotify "Liked Songs" library.
+A native macOS app to obsessively tidy your Spotify "Liked Songs" library.
 
 Over the years a liked-songs library accumulates cruft: the same song liked
 twice, the clean version *and* the explicit one, a track from the album *and*
 the same track from a greatest-hits compilation, songs that have gone
 unplayable in your country. `spotify-sanitizer` finds that mess and proposes a
-fix — but never touches your library until you've reviewed the plan.
+fix — but never touches your library until you've reviewed and approved it.
+
+It's a self-contained SwiftUI app (Swift Package Manager, no Xcode required to
+build). The whole engine — OAuth, the Spotify Web API, and the analyzer — is
+native Swift; nothing else is needed at runtime.
 
 ## What it does
 
@@ -17,66 +21,43 @@ fix — but never touches your library until you've reviewed the plan.
   3. album over single over compilation
   4. (tie-break) the copy you liked first
 - **Drop unplayable tracks** — the greyed-out ones that no longer play in your market.
-  - With `--find-alternatives`, instead of just dropping a dead track it looks up
+  - With **Find alternatives**, instead of just dropping a dead track it looks up
     the *same recording* (matched by ISRC **and** track length) on a release that
-    still plays in your market, and proposes swapping it in. Strictly opt-in, and
-    still just a proposal in the plan.
+    still plays in your market, and proposes swapping it in.
 - **Complete albums** — if you already like most of an album, it suggests liking
-  the rest *as a proposal*, so your library trends toward whole albums instead of
-  scattered cherry-picks.
-  - **Skits are respected.** Short tracks and ones titled *skit / interlude /
-    intro / outro / …* are excluded from the "is this album complete?" math and
-    are never suggested for adding — so deliberately dropping the junk doesn't
-    trigger a nag, and "complete" means "every track you'd actually want."
+  the rest. Short tracks and ones titled *skit / interlude / intro / outro / …*
+  are excluded from the "is this album complete?" math and never suggested.
 
-Everything is a **suggestion in a reviewable plan**. The heuristics will
-occasionally be wrong about a song you deliberately dropped — you see and edit
-the plan before anything happens.
+Everything is a **proposal you review** — tick/untick each row before anything happens.
 
 ## Safety model
 
-1. `scan` is **read-only**. It writes a `plan.json` (+ readable `.txt`) and changes nothing.
-2. You **review** the plan. Delete any entry you disagree with from the JSON.
-3. `apply` executes the reviewed plan and writes a **reversal log**.
-4. `undo` reverts any applied run from its log.
+1. **Scan** is read-only. It fetches your library and builds a plan; it changes nothing.
+2. You review the plan in the app and untick anything you disagree with.
+3. **Apply** executes the approved changes and writes a reversal log.
+4. **Undo** reverts the last apply from that log.
 
 ## Setup
 
-Requires Ruby ≥ 3.0 (standard library only — no gems needed to run).
+You need your own free Spotify app (a Client ID). This isn't optional friction:
+Spotify only lets a shared app serve >5 users if you're a registered business
+with 250k+ monthly active users, so every user brings their own — it works
+immediately for you alone, with no review.
 
-1. Create a free app at <https://developer.spotify.com/dashboard>.
-2. In the app settings, add this Redirect URI:
-   ```
-   http://127.0.0.1:8888/callback
-   ```
-3. Save your Client ID and authorize:
-   ```sh
-   bin/spotify-sanitizer login --client-id=YOUR_CLIENT_ID
-   ```
-   A browser opens; approve the requested scopes (`user-library-read`,
-   `user-library-modify`, and `user-read-private` so `--find-alternatives` can
-   search your market).
+1. Create an app in the [Spotify Developer Dashboard](https://developer.spotify.com/dashboard).
+2. Add this Redirect URI: `http://127.0.0.1:8888/callback`
+3. Launch the app, paste your Client ID when prompted, and press **Log in**.
 
-Config and tokens are stored under `~/.config/spotify-sanitizer/`
-(override with `SPOTIFY_SANITIZER_HOME`). Tokens never leave your machine.
+Tokens are cached under `~/.config/spotify-sanitizer/` and never leave your machine.
 
-## Usage
+## Build & run
+
+Requires the Swift toolchain (Command Line Tools is enough — no full Xcode).
 
 ```sh
-# Build a cleanup plan (read-only)
-bin/spotify-sanitizer scan
-
-# Tune the heuristics
-bin/spotify-sanitizer scan --threshold=0.8 --skit-seconds=45 --no-complete-albums
-
-# Try to replace unplayable tracks with a playable copy of the same recording
-bin/spotify-sanitizer scan --find-alternatives --market=NL
-
-# Review the printed plan / the files in ./plans, then:
-bin/spotify-sanitizer apply plans/20260625-120000.plan.json
-
-# Changed your mind:
-bin/spotify-sanitizer undo ~/.config/spotify-sanitizer/logs/apply-20260625-120500.json
+swift run SpotifySanitizer     # run the app
+./build-app.sh                 # build a double-clickable SpotifySanitizer.app
+open SpotifySanitizer.app
 ```
 
 ## How dedup decides two tracks are "the same"
@@ -88,7 +69,23 @@ collapses an album cut, its single release, and its remaster into one cluster,
 while keeping genuinely different songs apart. Within each cluster, the keeper
 is chosen by the preference rules above.
 
-This is a heuristic. That's exactly why `scan` and `apply` are separate steps.
+This is a heuristic — which is exactly why scan and apply are separate steps.
+
+## Layout
+
+```
+Sources/
+  SanitizerKit/        the engine (Config, Auth, Client, Library, Track, Analyzer, Apply, Engine)
+  SpotifySanitizer/    the SwiftUI app (App, AppModel, ContentView)
+  sanitizer-verify/    headless runner: --selftest, or a live scan
+```
+
+`Engine` is the only public surface; the UI and runner talk to it and nothing else.
+
+```sh
+swift run sanitizer-verify --selftest   # pure analyzer checks, no network
+swift run sanitizer-verify              # live scan; prints plan stats
+```
 
 ## License
 

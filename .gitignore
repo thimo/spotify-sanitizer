@@ -1,19 +1,12 @@
-# Runtime artifacts
-*.gem
-.bundle/
-vendor/bundle/
-
-# Swift / SPM build output (macapp/)
+# Swift / SPM build output
 .build/
 *.xcodeproj
 .swiftpm/
 *.app/
 
-# Generated plans / logs (local only, never commit a user's library data)
+# Generated artifacts (local only, never commit a user's library data)
 /plans/
 /logs/
-*.plan.json
-*.plan.txt
 
 # Editor / OS noise
 .DS_Store
