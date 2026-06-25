@@ -60,9 +60,10 @@ module SpotifySanitizer
       }
     end
 
-    def describe
+    def describe(with_album: true)
       tag = explicit ? "E" : " "
-      "[#{tag}] #{primary_artist} — #{name} (#{album_name}) #{(duration_ms / 1000)}s"
+      album = with_album ? " (#{album_name})" : ""
+      "[#{tag}] #{primary_artist} — #{name}#{album} #{(duration_ms / 1000)}s"
     end
   end
 end

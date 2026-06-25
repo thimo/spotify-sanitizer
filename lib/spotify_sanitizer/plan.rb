@@ -31,8 +31,10 @@ module SpotifySanitizer
     end
 
     def add(track, reason:)
-      @additions << Addition.new(id: track.id, label: track.describe, reason: reason,
-                                 album: track.album_name)
+      # The album is already the group header in to_text, so drop it from the
+      # per-track label to avoid printing it three times.
+      @additions << Addition.new(id: track.id, label: track.describe(with_album: false),
+                                 reason: reason, album: track.album_name)
     end
 
     def replace(dead, alternative, reason:)
