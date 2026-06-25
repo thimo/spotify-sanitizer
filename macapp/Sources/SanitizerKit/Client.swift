@@ -4,13 +4,21 @@ enum ApiError: Error, LocalizedError {
     case unauthorized
     case http(Int, String)
     case badResponse
+    case rateLimited(Int)   // Retry-After seconds
 
     var errorDescription: String? {
         switch self {
         case .unauthorized:        return "Unauthorized (401). Token may be revoked — log in again."
         case .http(let c, let p):  return "Spotify API error \(c) on \(p)"
         case .badResponse:         return "Unexpected response from Spotify."
+        case .rateLimited(let s):  return "Spotify rate limit hit — try again in about \(Self.humanize(s)). It clears on its own."
         }
+    }
+
+    static func humanize(_ seconds: Int) -> String {
+        if seconds >= 3600 { return "\(seconds / 3600)h \((seconds % 3600) / 60)m" }
+        if seconds >= 60 { return "\(seconds / 60) min" }
+        return "\(seconds)s"
     }
 }
 
@@ -18,6 +26,8 @@ enum ApiError: Error, LocalizedError {
 // cursor pagination, and 50-id batched library writes. Ported from client.rb.
 struct Client {
     static let base = "https://api.spotify.com/v1"
+    // Honour short 429 cool-downs inline; fail fast on anything longer.
+    static let maxAutoRetryWait = 90
 
     func get(_ path: String, _ params: [String: String] = [:]) async throws -> [String: Any] {
         try await request("GET", url: buildURL(path, params))
@@ -38,13 +48,15 @@ struct Client {
 
     // Walk a paginated endpoint, collecting every item. Spotify returns either a
     // top-level paging object or one nested under a key (e.g. "albums").
-    func eachPage(_ path: String, _ params: [String: String] = [:], key: String? = nil) async throws -> [[String: Any]] {
+    func eachPage(_ path: String, _ params: [String: String] = [:], key: String? = nil,
+                  onProgress: ((Int) -> Void)? = nil) async throws -> [[String: Any]] {
         var url = buildURL(path, params.merging(["limit": "50"]) { _, new in new })
         var items: [[String: Any]] = []
         while true {
             var page = try await request("GET", url: url)
             if let key, let nested = page[key] as? [String: Any] { page = nested }
             items.append(contentsOf: (page["items"] as? [[String: Any]]) ?? [])
+            onProgress?(items.count)
             guard let next = page["next"] as? String, !next.isEmpty, let nextURL = URL(string: next) else { break }
             url = nextURL
         }
@@ -79,13 +91,17 @@ struct Client {
             if data.isEmpty { return [:] }
             return (try? JSONSerialization.jsonObject(with: data) as? [String: Any]) ?? [:]
         case 429:
-            let wait = (Int(http.value(forHTTPHeaderField: "Retry-After") ?? "") ?? 1) + 1
-            try await Task.sleep(nanoseconds: UInt64(wait) * 1_000_000_000)
+            let retryAfter = Int(http.value(forHTTPHeaderField: "Retry-After") ?? "") ?? 1
+            Log.net("429 on \(url.path); Retry-After \(retryAfter)s")
+            // Auto-retry only short cool-downs; don't hang for minutes/hours.
+            guard retryAfter <= Client.maxAutoRetryWait else { throw ApiError.rateLimited(retryAfter) }
+            try await Task.sleep(nanoseconds: UInt64(retryAfter + 1) * 1_000_000_000)
             return try await request(method, url: url, body: body)
         case 401:
             throw ApiError.unauthorized
         default:
             let payload = String(data: data, encoding: .utf8) ?? ""
+            Log.net("error \(http.statusCode) on \(url.path): \(payload.prefix(200))")
             throw ApiError.http(http.statusCode, "\(url.path) \(payload)")
         }
     }

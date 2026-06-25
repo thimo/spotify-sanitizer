@@ -87,7 +87,20 @@ struct ContentView: View {
     @ViewBuilder private var content: some View {
         if let label = model.busy {
             Spacer()
-            VStack(spacing: 12) { ProgressView(); Text(label).foregroundStyle(.secondary) }
+            VStack(spacing: 12) {
+                if let p = model.progress, let fraction = p.fraction {
+                    ProgressView(value: fraction) {
+                        Text(p.label)
+                    } currentValueLabel: {
+                        Text("\(p.done) / \(p.total)").monospacedDigit()
+                    }
+                    .frame(maxWidth: 320)
+                } else {
+                    ProgressView()
+                    Text(model.progress.map { $0.done > 0 ? "\($0.label) (\($0.done))" : $0.label } ?? label)
+                        .foregroundStyle(.secondary)
+                }
+            }
             Spacer()
         } else if !model.clientIDSet {
             placeholder("No Spotify Client ID",

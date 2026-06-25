@@ -27,8 +27,12 @@ if args.contains("--selftest") {
 guard Engine.loggedIn() else { fail("Not logged in. Run the Ruby CLI `login` first.") }
 
 do {
-    FileHandle.standardError.write(Data("Scanning…\n".utf8))
-    let plan = try await Engine.scan(market: market, findAlternatives: findAlternatives)
+    let started = Date()
+    let plan = try await Engine.scan(market: market, findAlternatives: findAlternatives) { p in
+        let bar = p.total > 0 ? " \(p.done)/\(p.total)" : (p.done > 0 ? " \(p.done)" : "")
+        FileHandle.standardError.write(Data("\r\(p.label)\(bar)            ".utf8))
+    }
+    FileHandle.standardError.write(Data("\n".utf8))
 
     let order = ["liked_tracks_scanned", "duplicates_removed", "unplayable_removed",
                  "unplayable_replaced", "additions_suggested", "albums_kept"]
@@ -37,6 +41,7 @@ do {
         print(String(format: "  %-22s %d", (key as NSString).utf8String!, plan.stats[key] ?? 0))
     }
     print(String(repeating: "=", count: 50))
+    FileHandle.standardError.write(Data(String(format: "scan took %.1fs\n", Date().timeIntervalSince(started)).utf8))
 
     if !plan.replacements.isEmpty {
         print("\nREPLACE:")

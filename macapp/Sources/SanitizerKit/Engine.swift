@@ -15,11 +15,19 @@ public enum Engine {
         skitMaxSeconds: Int = 60,
         dropUnplayable: Bool = true,
         findAlternatives: Bool = false,
-        completeAlbums: Bool = true
+        completeAlbums: Bool = true,
+        progress: ((ScanProgress) -> Void)? = nil
     ) async throws -> Plan {
+        let started = Date()
         let client = Client()
         let library = Library(client: client, market: market ?? "from_token")
-        let tracks = try await library.likedTracks()
+
+        progress?(ScanProgress(label: "Fetching liked songs", done: 0, total: 0))
+        let fetchStart = Date()
+        let tracks = try await library.likedTracks { count in
+            progress?(ScanProgress(label: "Fetching liked songs", done: count, total: 0))
+        }
+        Log.scan("fetched \(tracks.count) liked tracks in \(Log.since(fetchStart))s")
 
         var options = Analyzer.Options()
         options.completionThreshold = completionThreshold
@@ -28,7 +36,14 @@ public enum Engine {
         options.findAlternatives = findAlternatives
         options.completeAlbums = completeAlbums
 
-        return try await Analyzer(tracks: tracks, library: library, options: options).buildPlan()
+        let analyzeStart = Date()
+        var analyzer = Analyzer(tracks: tracks, library: library, options: options)
+        analyzer.progress = progress
+        let plan = try await analyzer.buildPlan()
+        Log.scan("analyzed in \(Log.since(analyzeStart))s "
+                 + "(\(plan.removals.count) remove, \(plan.replacements.count) replace, \(plan.additions.count) add); "
+                 + "scan total \(Log.since(started))s")
+        return plan
     }
 
     // Execute the selected unlikes/likes and return the reversal-log URL.

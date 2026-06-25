@@ -7,6 +7,7 @@ final class AppModel: ObservableObject {
     @Published var clientIDSet = Engine.clientIDIsSet()
     @Published var plan: Plan?
     @Published var busy: String?          // non-nil = a label for the spinner
+    @Published var progress: ScanProgress?
     @Published var error: String?
     @Published var notice: String?
     @Published var findAlternatives = false
@@ -58,7 +59,9 @@ final class AppModel: ObservableObject {
 
     func scan() async {
         await run("Scanning your library…") {
-            let plan = try await Engine.scan(findAlternatives: self.findAlternatives)
+            let plan = try await Engine.scan(findAlternatives: self.findAlternatives) { p in
+                Task { @MainActor in self.progress = p }
+            }
             self.plan = plan
             self.excluded = []
             self.notice = plan.isEmpty ? "Nothing to do — your library is already spotless." : nil
@@ -91,5 +94,6 @@ final class AppModel: ObservableObject {
         do { try await work() }
         catch { self.error = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription }
         busy = nil
+        progress = nil
     }
 }

@@ -12,8 +12,8 @@ struct Library: LibraryProviding {
     var client: Client
     var market: String = "from_token"
 
-    func likedTracks() async throws -> [Track] {
-        try await client.eachPage("/me/tracks", ["market": market]).map { Track($0) }
+    func likedTracks(onProgress: ((Int) -> Void)? = nil) async throws -> [Track] {
+        try await client.eachPage("/me/tracks", ["market": market], onProgress: onProgress).map { Track($0) }
     }
 
     func albumTracks(_ albumID: String, albumName: String?) async throws -> [Track] {
