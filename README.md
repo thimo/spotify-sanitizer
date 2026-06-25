@@ -17,6 +17,10 @@ fix — but never touches your library until you've reviewed the plan.
   3. album over single over compilation
   4. (tie-break) the copy you liked first
 - **Drop unplayable tracks** — the greyed-out ones that no longer play in your market.
+  - With `--find-alternatives`, instead of just dropping a dead track it looks up
+    the *same recording* (matched by ISRC **and** track length) on a release that
+    still plays in your market, and proposes swapping it in. Strictly opt-in, and
+    still just a proposal in the plan.
 - **Complete albums** — if you already like most of an album, it suggests liking
   the rest *as a proposal*, so your library trends toward whole albums instead of
   scattered cherry-picks.
@@ -49,7 +53,9 @@ Requires Ruby ≥ 3.0 (standard library only — no gems needed to run).
    ```sh
    bin/spotify-sanitizer login --client-id=YOUR_CLIENT_ID
    ```
-   A browser opens; approve the `user-library-read` + `user-library-modify` scopes.
+   A browser opens; approve the requested scopes (`user-library-read`,
+   `user-library-modify`, and `user-read-private` so `--find-alternatives` can
+   search your market).
 
 Config and tokens are stored under `~/.config/spotify-sanitizer/`
 (override with `SPOTIFY_SANITIZER_HOME`). Tokens never leave your machine.
@@ -62,6 +68,9 @@ bin/spotify-sanitizer scan
 
 # Tune the heuristics
 bin/spotify-sanitizer scan --threshold=0.8 --skit-seconds=45 --no-complete-albums
+
+# Try to replace unplayable tracks with a playable copy of the same recording
+bin/spotify-sanitizer scan --find-alternatives --market=NL
 
 # Review the printed plan / the files in ./plans, then:
 bin/spotify-sanitizer apply plans/20260625-120000.plan.json

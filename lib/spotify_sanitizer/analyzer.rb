@@ -16,6 +16,10 @@ module SpotifySanitizer
       skit_max_seconds:     60,
       # Drop liked tracks that are unplayable in your market (greyed out).
       drop_unplayable:      true,
+      # For each unplayable track, look up the same recording (ISRC) on a
+      # playable release and propose swapping it in. Opt-in: costs a search
+      # call per dead track and needs market access (see CLI --find-alternatives).
+      find_alternatives:    false,
       # Suggest completing partially-liked albums.
       complete_albums:      true
     }.freeze
@@ -41,6 +45,7 @@ module SpotifySanitizer
         liked_tracks_scanned: @tracks.size,
         duplicates_removed:   plan.removals.count { |r| r.reason.start_with?("duplicate") },
         unplayable_removed:   plan.removals.count { |r| r.reason.start_with?("unplayable") },
+        unplayable_replaced:  plan.replacements.size,
         additions_suggested:  plan.additions.size,
         albums_kept:          kept.map(&:album_id).compact.uniq.size
       )
@@ -51,8 +56,22 @@ module SpotifySanitizer
 
     def drop_unplayable(tracks, plan)
       playable, dead = tracks.partition(&:playable)
-      dead.each { |t| plan.remove(t, reason: "unplayable in your market") }
+      dead.each do |t|
+        alt = alternative_for(t)
+        if alt
+          plan.replace(t, alt, reason: "unplayable in your market — same recording (ISRC) plays here")
+        else
+          plan.remove(t, reason: "unplayable in your market")
+        end
+      end
       playable
+    end
+
+    # Optional ISRC-exact stand-in for a dead track. nil unless opted in.
+    def alternative_for(track)
+      return nil unless @opts[:find_alternatives] && @library
+
+      @library.find_alternative(track)
     end
 
     # Collapse "same recording, different release" clusters down to one keeper.

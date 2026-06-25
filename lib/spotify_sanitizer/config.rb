@@ -16,7 +16,9 @@ module SpotifySanitizer
     # can ship without embedding any credential. The user registers a free app
     # at https://developer.spotify.com and drops the ID into config.json.
     DEFAULT_REDIRECT_URI = "http://127.0.0.1:8888/callback"
-    SCOPES = %w[user-library-read user-library-modify].freeze
+    # user-read-private lets the search endpoint resolve `market=from_token`,
+    # which the optional `--find-alternatives` scan needs.
+    SCOPES = %w[user-library-read user-library-modify user-read-private].freeze
 
     def home
       base = ENV["SPOTIFY_SANITIZER_HOME"] ||

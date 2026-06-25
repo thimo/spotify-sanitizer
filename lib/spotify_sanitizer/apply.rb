@@ -18,8 +18,11 @@ module SpotifySanitizer
     end
 
     def run(plan_hash, dry_run: false)
-      remove_ids = Array(plan_hash["removals"]).map { |r| r["id"] }.compact
-      add_ids    = Array(plan_hash["additions"]).map { |a| a["id"] }.compact
+      replacements = Array(plan_hash["replacements"])
+      remove_ids = Array(plan_hash["removals"]).map { |r| r["id"] }.compact +
+                   replacements.map { |r| r["remove_id"] }.compact
+      add_ids    = Array(plan_hash["additions"]).map { |a| a["id"] }.compact +
+                   replacements.map { |r| r["add_id"] }.compact
 
       if dry_run
         puts "DRY RUN — would unlike #{remove_ids.size}, like #{add_ids.size}. Nothing changed."

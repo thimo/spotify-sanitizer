@@ -47,7 +47,7 @@ module SpotifySanitizer
     end
 
     def cmd_scan(argv)
-      opts = { out: nil }
+      opts = { out: nil, market: nil }
       analyzer_opts = {}
       OptionParser.new do |o|
         o.banner = "Usage: spotify-sanitizer scan [options]"
@@ -55,11 +55,13 @@ module SpotifySanitizer
         o.on("--skit-seconds=N", Integer, "Tracks <= N seconds count as skits (default 60)") { |v| analyzer_opts[:skit_max_seconds] = v }
         o.on("--[no-]complete-albums", "Suggest completing partial albums (default on)") { |v| analyzer_opts[:complete_albums] = v }
         o.on("--[no-]drop-unplayable", "Remove unplayable tracks (default on)") { |v| analyzer_opts[:drop_unplayable] = v }
+        o.on("--find-alternatives", "For unplayable tracks, find the same recording (ISRC) on a playable release") { analyzer_opts[:find_alternatives] = true }
+        o.on("--market=CC", "Market for playability/search, e.g. NL (default: from your token)") { |v| opts[:market] = v }
         o.on("--out=DIR", "Where to write the plan (default ./plans)") { |v| opts[:out] = v }
       end.parse!(argv)
 
       client  = Client.new
-      library = Library.new(client)
+      library = opts[:market] ? Library.new(client, market: opts[:market]) : Library.new(client)
 
       print "Fetching your liked songs… "
       tracks = library.liked_tracks
@@ -101,10 +103,11 @@ module SpotifySanitizer
 
       path = argv.shift or abort "Usage: spotify-sanitizer apply <plan.json>"
       plan = Plan.load_json(path)
-      removals = plan["removals"].to_a.size
-      additions = plan["additions"].to_a.size
+      replacements = plan["replacements"].to_a.size
+      removals = plan["removals"].to_a.size + replacements
+      additions = plan["additions"].to_a.size + replacements
 
-      puts "Plan: unlike #{removals}, like #{additions}."
+      puts "Plan: unlike #{removals}, like #{additions} (incl. #{replacements} replacement(s))."
       unless dry || yes
         print "Apply these changes to your Spotify library? [y/N] "
         abort "Aborted." unless $stdin.gets.to_s.strip.downcase.start_with?("y")
@@ -140,6 +143,8 @@ module SpotifySanitizer
           --skit-seconds=N        Tracks <= N seconds count as skits (default 60)
           --no-complete-albums    Don't suggest completing partial albums
           --no-drop-unplayable    Keep unplayable/greyed-out tracks
+          --find-alternatives     Replace unplayable tracks with the same recording (ISRC) from a playable release
+          --market=CC             Market for playability/search, e.g. NL (default: from your token)
           --out=DIR               Where to write the plan (default ./plans)
 
         scan never changes anything. apply does, and writes a reversal log.

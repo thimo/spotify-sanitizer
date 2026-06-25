@@ -81,5 +81,35 @@ module SpotifySanitizer
       assert Track.new(Factory.saved(name: "Short bit", duration_ms: 30_000)).skit?
       refute Track.new(Factory.saved(name: "Real Song", duration_ms: 200_000)).skit?
     end
+
+    # Stub Library that hands back a fixed alternative, so the analyzer's
+    # replacement path is testable without touching the network.
+    def stub_library(alternative)
+      lib = Object.new
+      lib.define_singleton_method(:find_alternative) { |_track| alternative }
+      lib
+    end
+
+    def test_find_alternatives_replaces_unplayable
+      dead = Factory.saved(name: "Gone", playable: false, isrc: "USABC1234567", id: "dead")
+      alt  = Track.new(Factory.saved(name: "Gone", playable: true, isrc: "USABC1234567",
+                                     id: "alive", album: "Reissue"))
+      plan = Analyzer.new([Track.new(dead)], library: stub_library(alt),
+                          options: { complete_albums: false, find_alternatives: true }).build_plan
+
+      assert_empty plan.removals
+      assert_equal 1, plan.replacements.size
+      assert_equal "dead",  plan.replacements.first.remove_id
+      assert_equal "alive", plan.replacements.first.add_id
+    end
+
+    def test_unplayable_without_alternative_falls_back_to_removal
+      dead = Track.new(Factory.saved(name: "Gone", playable: false, id: "dead"))
+      plan = Analyzer.new([dead], library: stub_library(nil),
+                          options: { complete_albums: false, find_alternatives: true }).build_plan
+
+      assert_equal ["dead"], plan.removals.map(&:id)
+      assert_empty plan.replacements
+    end
   end
 end

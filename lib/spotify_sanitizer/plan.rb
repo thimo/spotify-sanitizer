@@ -12,13 +12,17 @@ module SpotifySanitizer
   class Plan
     Removal = Struct.new(:id, :label, :reason, :keeper_label, keyword_init: true)
     Addition = Struct.new(:id, :label, :reason, :album, keyword_init: true)
+    # A paired swap: unlike `remove_id` (dead) and like `add_id` (the playable
+    # alternative). Apply folds these into its remove/add id lists.
+    Replacement = Struct.new(:remove_id, :remove_label, :add_id, :add_label, :reason, keyword_init: true)
 
-    attr_reader :removals, :additions, :stats
+    attr_reader :removals, :additions, :replacements, :stats
 
     def initialize
-      @removals  = []
-      @additions = []
-      @stats     = {}
+      @removals     = []
+      @additions    = []
+      @replacements = []
+      @stats        = {}
     end
 
     def remove(track, reason:, keeper: nil)
@@ -31,7 +35,13 @@ module SpotifySanitizer
                                  album: track.album_name)
     end
 
-    def empty? = removals.empty? && additions.empty?
+    def replace(dead, alternative, reason:)
+      @replacements << Replacement.new(remove_id: dead.id, remove_label: dead.describe,
+                                       add_id: alternative.id, add_label: alternative.describe,
+                                       reason: reason)
+    end
+
+    def empty? = removals.empty? && additions.empty? && replacements.empty?
 
     def to_h
       {
@@ -39,7 +49,8 @@ module SpotifySanitizer
         version:      VERSION,
         stats:        stats,
         removals:     removals.map(&:to_h),
-        additions:    additions.map(&:to_h)
+        additions:    additions.map(&:to_h),
+        replacements: replacements.map(&:to_h)
       }
     end
 
@@ -68,6 +79,16 @@ module SpotifySanitizer
         lines << "      keeps:  #{r.keeper_label}" if r.keeper_label
       end
       lines << "  (none)" if removals.empty?
+      lines << ""
+
+      lines << "REPLACE — #{replacements.size} unplayable track(s) with a playable copy"
+      lines << "-" * 64
+      replacements.each do |r|
+        lines << "  ✗ #{r.remove_label}"
+        lines << "  ✓ #{r.add_label}"
+        lines << "      reason: #{r.reason}"
+      end
+      lines << "  (none)" if replacements.empty?
       lines << ""
 
       lines << "ADD — #{additions.size} track(s) to like (album completion)"
