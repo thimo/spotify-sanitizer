@@ -12,14 +12,14 @@ module SpotifySanitizer
     # `is_playable`, which the analyzer uses to drop unavailable tracks.
     def liked_tracks
       tracks = []
-      @client.each_page("/me/tracks", market: @market) { |item| tracks << Track.new(item) }
+      @client.each_page("/me/tracks", { market: @market }) { |item| tracks << Track.new(item) }
       tracks
     end
 
     # Full tracklist of an album (for accurate completion checks).
     def album_tracks(album_id)
       tracks = []
-      @client.each_page("/albums/#{album_id}/tracks", market: @market) do |item|
+      @client.each_page("/albums/#{album_id}/tracks", { market: @market }) do |item|
         # /albums/{id}/tracks items are bare track objects without the album
         # block, so graft a minimal one back on for Track to chew.
         tracks << Track.new("track" => item.merge("album" => { "id" => album_id }))

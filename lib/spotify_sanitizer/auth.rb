@@ -113,8 +113,11 @@ module SpotifySanitizer
       loop do
         socket = server.accept
         request_line = socket.gets.to_s
-        # Drain headers so the client gets a clean response.
-        socket.gets until socket.eof? || socket.gets.to_s.strip.empty?
+        # Drain the rest of the request headers up to the blank line so the
+        # browser gets a clean response. Read one line at a time and stop at the
+        # CRLF; never call eof?, which blocks while the browser holds the
+        # connection open waiting for our reply.
+        while (line = socket.gets) && !line.strip.empty?; end
 
         unless request_line.start_with?("GET #{path}")
           respond(socket, 404, "Not found")
