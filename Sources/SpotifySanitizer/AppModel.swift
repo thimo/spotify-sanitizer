@@ -19,6 +19,14 @@ final class AppModel: ObservableObject {
 
     init() {
         lastLog = Engine.latestLog
+        // --demo: load a fixture plan (no network) for UI work across restarts.
+        if CommandLine.arguments.contains("--demo") {
+            loggedIn = true
+            clientIDSet = true
+            plan = Engine.samplePlan()
+            scannedAt = Date()
+            return
+        }
         // Reload the last scan so it survives a restart (and isn't re-fetched).
         if let cached = Engine.cachedPlan() {
             plan = cached.plan

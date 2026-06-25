@@ -99,3 +99,47 @@ public struct CachedPlan: Codable {
     public var plan: Plan
     public var scannedAt: Date
 }
+
+public extension Engine {
+    // A fixture plan for UI work — no network, no auth, no rate limit. Artwork
+    // uses Lorem Picsum (stable per seed) so layout/thumbnails are realistic.
+    static func samplePlan() -> Plan {
+        func card(_ id: String, _ artist: String, _ title: String, _ album: String,
+                  _ secs: Int, explicit: Bool = false) -> Card {
+            Card(id: id, artist: artist, title: title, album: album, explicit: explicit,
+                 durationMs: secs * 1000,
+                 image: "https://picsum.photos/seed/\(id)/100",
+                 url: "https://open.spotify.com/track/\(id)")
+        }
+
+        var plan = Plan()
+        plan.removals = [
+            .init(card: card("dup1", "Daft Punk", "Get Lucky", "Random Access Memories", 248),
+                  reason: "duplicate — keeping one copy",
+                  keeper: card("dup1k", "Daft Punk", "Get Lucky", "Random Access Memories", 369)),
+            .init(card: card("cln1", "Kendrick Lamar", "DNA.", "DAMN.", 185),
+                  reason: "duplicate — clean version, keeping explicit",
+                  keeper: card("exp1", "Kendrick Lamar", "DNA.", "DAMN.", 185, explicit: true)),
+            .init(card: card("dead1", "De La Soul", "Saturdays", "Swing", 197),
+                  reason: "unplayable in your market", keeper: nil)
+        ]
+        plan.replacements = [
+            .init(dead: card("dead2", "Santa Esmeralda", "Don't Let Me Be Misunderstood", "Kill Bill OST (PA)", 628),
+                  alternative: card("alt2", "Santa Esmeralda", "Don't Let Me Be Misunderstood", "House Of The Rising Sun", 628),
+                  reason: "unplayable in your market — same recording (ISRC) plays here")
+        ]
+        plan.additions = [
+            .init(card: card("add1", "Makaveli", "Hail Mary", "The Don Killuminati", 309, explicit: true),
+                  reason: "you like 9/12 of \"The Don Killuminati\""),
+            .init(card: card("add2", "Makaveli", "To Live & Die in L.A.", "The Don Killuminati", 273, explicit: true),
+                  reason: "you like 9/12 of \"The Don Killuminati\""),
+            .init(card: card("add3", "JAY-Z", "Encore", "The Black Album", 250, explicit: true),
+                  reason: "you like 10/12 of \"The Black Album\"")
+        ]
+        plan.stats = [
+            "liked_tracks_scanned": 3331, "duplicates_removed": 166, "unplayable_removed": 52,
+            "unplayable_replaced": 1, "additions_suggested": 145, "albums_kept": 1139
+        ]
+        return plan
+    }
+}
