@@ -30,4 +30,26 @@ public enum Engine {
 
         return try await Analyzer(tracks: tracks, library: library, options: options).buildPlan()
     }
+
+    // Execute the selected unlikes/likes and return the reversal-log URL.
+    @discardableResult
+    public static func apply(removeIDs: [String], addIDs: [String]) async throws -> URL {
+        try await Apply().run(removeIDs: removeIDs, addIDs: addIDs)
+    }
+
+    public static func undo(logURL: URL) async throws -> (reliked: Int, unliked: Int) {
+        try await Apply().undo(logURL: logURL)
+    }
+
+    // Most recent reversal log, if any (for a one-click Undo).
+    public static var latestLog: URL? {
+        let dir = Config.home.appendingPathComponent("logs")
+        let logs = (try? FileManager.default.contentsOfDirectory(at: dir, includingPropertiesForKeys: [.contentModificationDateKey]))?
+            .filter { $0.pathExtension == "json" } ?? []
+        return logs.sorted {
+            let a = (try? $0.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate ?? .distantPast
+            let b = (try? $1.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate ?? .distantPast
+            return a > b
+        }.first
+    }
 }

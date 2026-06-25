@@ -6,6 +6,8 @@ import AppKit
 // foreground app and activate.
 @main
 struct SpotifySanitizerApp: App {
+    @StateObject private var model = AppModel()
+
     init() {
         NSApplication.shared.setActivationPolicy(.regular)
         NSApplication.shared.activate(ignoringOtherApps: true)
@@ -13,24 +15,8 @@ struct SpotifySanitizerApp: App {
 
     var body: some Scene {
         WindowGroup("Spotify Sanitizer") {
-            ContentView()
+            ContentView().environmentObject(model)
         }
-        .defaultSize(width: 900, height: 640)
-    }
-}
-
-struct ContentView: View {
-    var body: some View {
-        VStack(spacing: 12) {
-            Image(systemName: "music.note.list")
-                .font(.system(size: 48))
-                .foregroundStyle(.green)
-            Text("Spotify Sanitizer")
-                .font(.largeTitle.bold())
-            Text("Scaffold OK — engine port next.")
-                .foregroundStyle(.secondary)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .padding()
+        .defaultSize(width: 980, height: 700)
     }
 }
