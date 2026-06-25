@@ -1,12 +1,12 @@
 import Foundation
 
-enum ApiError: Error, LocalizedError {
+public enum ApiError: Error, LocalizedError {
     case unauthorized
     case http(Int, String)
     case badResponse
     case rateLimited(Int)   // Retry-After seconds
 
-    var errorDescription: String? {
+    public var errorDescription: String? {
         switch self {
         case .unauthorized:        return "Unauthorized (401). Token may be revoked — log in again."
         case .http(let c, let p):  return "Spotify API error \(c) on \(p)"

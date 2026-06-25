@@ -10,6 +10,7 @@ final class AppModel: ObservableObject {
     @Published var progress: ScanProgress?
     @Published var error: String?
     @Published var notice: String?
+    @Published var rateLimited: String?   // distinct, friendlier than a generic error
     @Published var findAlternatives = false
     @Published var excluded: Set<UUID> = []   // entries the user unticked
     @Published var lastLog: URL?
@@ -91,7 +92,12 @@ final class AppModel: ObservableObject {
         busy = label
         error = nil
         notice = nil
+        rateLimited = nil
         do { try await work() }
+        catch let api as ApiError {
+            if case .rateLimited = api { self.rateLimited = api.errorDescription }
+            else { self.error = api.errorDescription }
+        }
         catch { self.error = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription }
         busy = nil
         progress = nil

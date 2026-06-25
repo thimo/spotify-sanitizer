@@ -62,6 +62,9 @@ struct ContentView: View {
 
     private var banners: some View {
         VStack(spacing: 0) {
+            if let rateLimited = model.rateLimited {
+                banner(rateLimited, color: .orange, icon: "clock.badge.exclamationmark.fill")
+            }
             if let error = model.error {
                 banner(error, color: .red, icon: "exclamationmark.triangle.fill")
             }
