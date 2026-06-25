@@ -3,6 +3,11 @@
 .bundle/
 vendor/bundle/
 
+# Swift / SPM build output (macapp/)
+.build/
+*.xcodeproj
+.swiftpm/
+
 # Generated plans / logs (local only, never commit a user's library data)
 /plans/
 /logs/
