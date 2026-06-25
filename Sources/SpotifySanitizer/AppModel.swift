@@ -15,8 +15,16 @@ final class AppModel: ObservableObject {
     @Published var clientIDInput = ""
     @Published var excluded: Set<UUID> = []   // entries the user unticked
     @Published var lastLog: URL?
+    @Published var scannedAt: Date?           // when the shown plan was built
 
-    init() { lastLog = Engine.latestLog }
+    init() {
+        lastLog = Engine.latestLog
+        // Reload the last scan so it survives a restart (and isn't re-fetched).
+        if let cached = Engine.cachedPlan() {
+            plan = cached.plan
+            scannedAt = cached.scannedAt
+        }
+    }
 
     var isBusy: Bool { busy != nil }
 
@@ -74,6 +82,8 @@ final class AppModel: ObservableObject {
             }
             self.plan = plan
             self.excluded = []
+            self.scannedAt = Date()
+            Engine.cachePlan(plan)
             self.notice = plan.isEmpty ? "Nothing to do — your library is already spotless." : nil
         }
     }
@@ -85,6 +95,8 @@ final class AppModel: ObservableObject {
             self.lastLog = log
             self.notice = "Applied: \(ids.remove.count) unliked, \(ids.add.count) liked."
             self.plan = nil
+            self.scannedAt = nil
+            Engine.clearCachedPlan()   // the plan no longer matches the library
         }
     }
 

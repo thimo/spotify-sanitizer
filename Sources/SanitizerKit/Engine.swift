@@ -72,4 +72,30 @@ public enum Engine {
             return a > b
         }.first
     }
+
+    // MARK: - Plan cache (so a scan survives a restart and isn't re-fetched)
+
+    private static var planCacheURL: URL { Config.home.appendingPathComponent("last-plan.json") }
+
+    public static func cachePlan(_ plan: Plan) {
+        let cached = CachedPlan(plan: plan, scannedAt: Date())
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted]
+        guard let data = try? encoder.encode(cached) else { return }
+        try? data.write(to: planCacheURL)
+    }
+
+    public static func cachedPlan() -> CachedPlan? {
+        guard let data = try? Data(contentsOf: planCacheURL) else { return nil }
+        return try? JSONDecoder().decode(CachedPlan.self, from: data)
+    }
+
+    public static func clearCachedPlan() {
+        try? FileManager.default.removeItem(at: planCacheURL)
+    }
+}
+
+public struct CachedPlan: Codable {
+    public var plan: Plan
+    public var scannedAt: Date
 }

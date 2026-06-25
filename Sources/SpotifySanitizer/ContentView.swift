@@ -176,12 +176,18 @@ struct PlanView: View {
             let order = [("liked_tracks_scanned", "scanned"), ("duplicates_removed", "duplicates"),
                          ("unplayable_removed", "unplayable"), ("unplayable_replaced", "replaced"),
                          ("additions_suggested", "additions"), ("albums_kept", "albums")]
-            HStack(spacing: 18) {
-                ForEach(order, id: \.0) { key, label in
-                    VStack {
-                        Text("\(plan.stats[key] ?? 0)").font(.title3.monospacedDigit().bold())
-                        Text(label).font(.caption).foregroundStyle(.secondary)
+            VStack(spacing: 6) {
+                HStack(spacing: 18) {
+                    ForEach(order, id: \.0) { key, label in
+                        VStack {
+                            Text("\(plan.stats[key] ?? 0)").font(.title3.monospacedDigit().bold())
+                            Text(label).font(.caption).foregroundStyle(.secondary)
+                        }
                     }
+                }
+                if let scannedAt = model.scannedAt {
+                    Text("Scanned \(Text(scannedAt, style: .relative)) ago — Scan again to refresh.")
+                        .font(.caption2).foregroundStyle(.secondary)
                 }
             }
             .frame(maxWidth: .infinity)
