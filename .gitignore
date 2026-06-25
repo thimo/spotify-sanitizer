@@ -1,0 +1,16 @@
+# Runtime artifacts
+*.gem
+.bundle/
+vendor/bundle/
+
+# Generated plans / logs (local only, never commit a user's library data)
+/plans/
+/logs/
+*.plan.json
+*.plan.txt
+
+# Editor / OS noise
+.DS_Store
+.idea/
+.vscode/
+*.swp
