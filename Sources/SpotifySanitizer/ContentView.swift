@@ -63,8 +63,8 @@ struct ContentView: View {
 
     private var banners: some View {
         VStack(spacing: 0) {
-            if let rateLimited = model.rateLimited {
-                banner(rateLimited, color: .orange, icon: "clock.badge.exclamationmark.fill")
+            if let until = model.rateLimitedUntil {
+                RateLimitBanner(until: until)
             }
             if let error = model.error {
                 banner(error, color: .red, icon: "exclamationmark.triangle.fill")
@@ -323,5 +323,39 @@ struct ClientIDSetup: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity).padding()
+    }
+}
+
+// Live countdown to when Spotify said we may retry. Spotify doesn't publish
+// exact limits (throttling is over a rolling 30s window), but a 429 does tell
+// us the wait — so we show that rather than a fake "% of limit" gauge.
+struct RateLimitBanner: View {
+    let until: Date
+
+    var body: some View {
+        TimelineView(.periodic(from: .now, by: 1)) { context in
+            let remaining = max(0, until.timeIntervalSince(context.date))
+            HStack {
+                Image(systemName: "clock.badge.exclamationmark.fill")
+                if remaining > 0 {
+                    Text("Spotify rate limit reached — try again in \(Self.format(remaining)).")
+                } else {
+                    Text("Spotify rate limit should be clear now — try again.")
+                }
+                Spacer()
+            }
+            .padding(8)
+            .background(Color.orange.opacity(0.12))
+            .foregroundStyle(.orange)
+        }
+        .help("Spotify doesn't publish exact limits; it throttles over a rolling 30-second window and tells us when to retry.")
+    }
+
+    static func format(_ seconds: TimeInterval) -> String {
+        let s = Int(seconds.rounded())
+        let h = s / 3600, m = (s % 3600) / 60, sec = s % 60
+        if h > 0 { return "\(h)h \(m)m \(sec)s" }
+        if m > 0 { return "\(m)m \(sec)s" }
+        return "\(sec)s"
     }
 }

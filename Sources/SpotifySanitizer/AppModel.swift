@@ -10,7 +10,7 @@ final class AppModel: ObservableObject {
     @Published var progress: ScanProgress?
     @Published var error: String?
     @Published var notice: String?
-    @Published var rateLimited: String?   // distinct, friendlier than a generic error
+    @Published var rateLimitedUntil: Date?   // when Spotify says we may retry
     @Published var findAlternatives = false
     @Published var clientIDInput = ""
     @Published var excluded: Set<UUID> = []   // entries the user unticked
@@ -101,11 +101,12 @@ final class AppModel: ObservableObject {
         busy = label
         error = nil
         notice = nil
-        rateLimited = nil
+        rateLimitedUntil = nil
         do { try await work() }
         catch let api as ApiError {
-            if case .rateLimited = api { self.rateLimited = api.errorDescription }
-            else { self.error = api.errorDescription }
+            if case .rateLimited(let seconds) = api {
+                self.rateLimitedUntil = Date().addingTimeInterval(Double(seconds))
+            } else { self.error = api.errorDescription }
         }
         catch { self.error = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription }
         busy = nil
