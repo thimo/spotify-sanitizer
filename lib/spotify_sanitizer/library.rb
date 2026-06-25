@@ -17,12 +17,14 @@ module SpotifySanitizer
     end
 
     # Full tracklist of an album (for accurate completion checks).
-    def album_tracks(album_id)
+    # Pass album_name so the resulting Tracks describe themselves with a title
+    # (the /albums/{id}/tracks payload omits it).
+    def album_tracks(album_id, album_name: nil)
       tracks = []
       @client.each_page("/albums/#{album_id}/tracks", { market: @market }) do |item|
         # /albums/{id}/tracks items are bare track objects without the album
         # block, so graft a minimal one back on for Track to chew.
-        tracks << Track.new("track" => item.merge("album" => { "id" => album_id }))
+        tracks << Track.new("track" => item.merge("album" => { "id" => album_id, "name" => album_name }))
       end
       tracks
     end

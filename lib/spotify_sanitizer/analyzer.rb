@@ -130,7 +130,7 @@ module SpotifySanitizer
         # Rough gate before spending an API call on the full tracklist.
         next if (liked_real.size.to_f / total) < @opts[:completion_threshold]
 
-        full = @library.album_tracks(album_id)
+        full = @library.album_tracks(album_id, album_name: liked.first.album_name)
         liked_ids = liked.map(&:id).to_set
         missing = full.reject { |t| liked_ids.include?(t.id) }
                       .reject { |t| t.skit?(max_seconds: @opts[:skit_max_seconds]) }
