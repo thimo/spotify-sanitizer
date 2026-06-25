@@ -5,6 +5,11 @@ import Foundation
 public enum Engine {
     public static func loggedIn() -> Bool { Auth.loggedIn() }
     public static func clientIDIsSet() -> Bool { (try? Config.clientID()) != nil }
+    public static let redirectURI = Config.defaultRedirectURI
+
+    public static func saveClientID(_ id: String) {
+        Config.saveConfig(["client_id": id.trimmingCharacters(in: .whitespacesAndNewlines)])
+    }
 
     public static func login() async throws { try await Auth.login() }
 

@@ -12,6 +12,7 @@ final class AppModel: ObservableObject {
     @Published var notice: String?
     @Published var rateLimited: String?   // distinct, friendlier than a generic error
     @Published var findAlternatives = false
+    @Published var clientIDInput = ""
     @Published var excluded: Set<UUID> = []   // entries the user unticked
     @Published var lastLog: URL?
 
@@ -48,6 +49,14 @@ final class AppModel: ObservableObject {
     }
 
     // MARK: actions
+
+    func saveClientID() {
+        let id = clientIDInput.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !id.isEmpty else { return }
+        Engine.saveClientID(id)
+        clientIDSet = Engine.clientIDIsSet()
+        clientIDInput = ""
+    }
 
     func login() async {
         await run("Authorizing in your browser…") {

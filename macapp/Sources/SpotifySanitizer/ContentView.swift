@@ -1,4 +1,5 @@
 import SwiftUI
+import AppKit
 import SanitizerKit
 
 struct ContentView: View {
@@ -106,9 +107,7 @@ struct ContentView: View {
             }
             Spacer()
         } else if !model.clientIDSet {
-            placeholder("No Spotify Client ID",
-                        "Save one with the CLI: spotify-sanitizer login --client-id=YOUR_ID",
-                        systemImage: "key")
+            ClientIDSetup().environmentObject(model)
         } else if !model.loggedIn {
             VStack(spacing: 14) {
                 Image(systemName: "person.crop.circle.badge.checkmark").font(.system(size: 44)).foregroundStyle(.green)
@@ -279,5 +278,50 @@ struct SpotifyLink: View {
             Link(destination: link) { Image(systemName: "arrow.up.right.square") }
                 .help("Open in Spotify")
         }
+    }
+}
+
+// First-run setup: every user registers their own free Spotify app (Spotify
+// only grants >5 users to ≥250k-MAU businesses, so a shared app isn't an option).
+struct ClientIDSetup: View {
+    @EnvironmentObject var model: AppModel
+
+    private var redirectURI: String { SanitizerKit.Engine.redirectURI }
+
+    var body: some View {
+        VStack(spacing: 16) {
+            Image(systemName: "key").font(.system(size: 40)).foregroundStyle(.secondary)
+            Text("Connect your Spotify app").font(.title3.bold())
+            Text("This needs a free Spotify app of your own (Spotify doesn't allow one shared app). "
+                 + "Create one, add the redirect URI below, then paste its Client ID here.")
+                .font(.callout).foregroundStyle(.secondary)
+                .multilineTextAlignment(.center).frame(maxWidth: 460)
+
+            Link(destination: URL(string: "https://developer.spotify.com/dashboard")!) {
+                Label("Open Spotify Dashboard", systemImage: "safari")
+            }
+            .controlSize(.large)
+
+            HStack(spacing: 8) {
+                Text("Redirect URI").font(.caption).foregroundStyle(.secondary)
+                Text(redirectURI).font(.system(.callout, design: .monospaced)).textSelection(.enabled)
+                    .padding(.horizontal, 8).padding(.vertical, 4)
+                    .background(.quaternary).clipShape(RoundedRectangle(cornerRadius: 5))
+                Button {
+                    NSPasteboard.general.clearContents()
+                    NSPasteboard.general.setString(redirectURI, forType: .string)
+                } label: { Image(systemName: "doc.on.doc") }
+                .buttonStyle(.borderless).help("Copy redirect URI")
+            }
+
+            HStack {
+                TextField("Client ID", text: $model.clientIDInput)
+                    .textFieldStyle(.roundedBorder).frame(width: 320)
+                    .onSubmit { model.saveClientID() }
+                Button("Save") { model.saveClientID() }
+                    .disabled(model.clientIDInput.trimmingCharacters(in: .whitespaces).isEmpty)
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity).padding()
     }
 }
