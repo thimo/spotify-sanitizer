@@ -205,6 +205,12 @@ struct SettingsView: View {
 struct PlanView: View {
     @EnvironmentObject var model: AppModel
     let plan: Plan
+    @State private var collapsed: Set<String> = []
+
+    private func collapseBinding(_ key: String) -> Binding<Bool> {
+        Binding(get: { collapsed.contains(key) },
+                set: { isOn in if isOn { collapsed.insert(key) } else { collapsed.remove(key) } })
+    }
 
     var body: some View {
         ScrollView {
@@ -213,7 +219,8 @@ struct PlanView: View {
                 if !plan.removals.isEmpty {
                     VStack(alignment: .leading, spacing: 16) {
                         SectionHeader(title: "Remove — \(plan.removals.count) to unlike",
-                                      ids: plan.removals.map(\.id))
+                                      ids: plan.removals.map(\.id), collapsed: collapseBinding("remove"))
+                        if !collapsed.contains("remove") {
                         ForEach(removalGroups, id: \.reason) { group in
                             let hasKeeper = group.items.first?.keeper != nil
                             VStack(alignment: .leading, spacing: 8) {
@@ -232,11 +239,12 @@ struct PlanView: View {
                                 }
                             }
                         }
+                        }
                     }
                 }
                 if !plan.replacements.isEmpty {
                     section("Replace — \(plan.replacements.count) unplayable",
-                            ids: plan.replacements.map(\.id), minWidth: 360) {
+                            ids: plan.replacements.map(\.id), minWidth: 360, key: "replace") {
                         ForEach(plan.replacements) { rep in
                             ReplacementRow(entryID: rep.id, replacement: rep)
                         }
@@ -244,7 +252,7 @@ struct PlanView: View {
                 }
                 if !plan.completions.isEmpty {
                     section("Add — \(plan.additionsCount) to complete albums",
-                            ids: plan.completions.flatMap { $0.missing.map(\.id) }, minWidth: 360) {
+                            ids: plan.completions.flatMap { $0.missing.map(\.id) }, minWidth: 360, key: "add") {
                         ForEach(plan.completions) { completion in
                             AlbumCompletionView(completion: completion)
                         }
@@ -259,11 +267,13 @@ struct PlanView: View {
     // A section header plus an adaptive grid that flows into as many columns as
     // the window width allows (min cell width tuned per section).
     @ViewBuilder
-    private func section<Content: View>(_ title: String, ids: [UUID], minWidth: CGFloat,
+    private func section<Content: View>(_ title: String, ids: [UUID], minWidth: CGFloat, key: String,
                                         @ViewBuilder content: () -> Content) -> some View {
         VStack(alignment: .leading, spacing: 10) {
-            SectionHeader(title: title, ids: ids)
-            LazyVGrid(columns: gridColumns(minWidth), spacing: 10) { content() }
+            SectionHeader(title: title, ids: ids, collapsed: collapseBinding(key))
+            if !collapsed.contains(key) {
+                LazyVGrid(columns: gridColumns(minWidth), spacing: 10) { content() }
+            }
         }
     }
 
@@ -325,9 +335,15 @@ struct SectionHeader: View {
     @EnvironmentObject var model: AppModel
     let title: String
     let ids: [UUID]
+    var collapsed: Binding<Bool>? = nil
 
     var body: some View {
-        HStack {
+        HStack(spacing: 6) {
+            if let collapsed {
+                Image(systemName: "chevron.right")
+                    .font(.caption.bold()).foregroundStyle(.secondary)
+                    .rotationEffect(.degrees(collapsed.wrappedValue ? 0 : 90))
+            }
             Text(title).font(.headline)
             Spacer()
             let allOn = model.allIncluded(ids)
@@ -336,6 +352,8 @@ struct SectionHeader: View {
             }
             .font(.caption).textCase(nil).buttonStyle(.borderless)
         }
+        .contentShape(Rectangle())
+        .onTapGesture { collapsed?.wrappedValue.toggle() }
     }
 }
 
