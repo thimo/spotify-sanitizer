@@ -109,7 +109,8 @@ public extension Engine {
             Card(id: id, artist: artist, title: title, album: album, explicit: explicit,
                  durationMs: secs * 1000,
                  image: "https://picsum.photos/seed/\(id)/100",
-                 url: "https://open.spotify.com/track/\(id)")
+                 url: "https://open.spotify.com/track/\(id)",
+                 uri: "spotify:track:\(id)")
         }
 
         var plan = Plan()

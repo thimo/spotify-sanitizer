@@ -9,7 +9,8 @@ public struct Card: Codable, Hashable {
     public var explicit: Bool
     public var durationMs: Int
     public var image: String?
-    public var url: String?
+    public var url: String?        // open.spotify.com web link (fallback)
+    public var uri: String?        // spotify:track:… — opens the desktop app
 
     public var durationSeconds: Int { durationMs / 1000 }
 }

@@ -113,6 +113,7 @@ struct Track {
              explicit: explicit,
              durationMs: durationMs,
              image: imageURL,
-             url: spotifyURL)
+             url: spotifyURL,
+             uri: uri ?? id.map { "spotify:track:\($0)" })
     }
 }

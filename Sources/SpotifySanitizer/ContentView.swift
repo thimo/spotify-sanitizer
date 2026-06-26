@@ -230,7 +230,7 @@ struct CardRow: View {
             }
             Spacer()
             Text("\(card.durationSeconds)s").font(.caption.monospacedDigit()).foregroundStyle(.secondary)
-            SpotifyLink(url: card.url)
+            SpotifyLink(card: card)
         }
         .padding(.vertical, 2)
         .opacity(model.included(entryID) ? 1 : 0.4)
@@ -264,7 +264,7 @@ struct ReplacementRow: View {
             if card.explicit { ExplicitTag() }
             Text("\(card.artist) — \(card.title)").lineLimit(1)
             Spacer()
-            SpotifyLink(url: card.url)
+            SpotifyLink(card: card)
         }
     }
 }
@@ -278,10 +278,15 @@ struct ExplicitTag: View {
 }
 
 struct SpotifyLink: View {
-    let url: String?
+    let card: Card
+    // Prefer the spotify: URI (opens the desktop app); fall back to the web link.
+    private var target: URL? {
+        if let uri = card.uri, let u = URL(string: uri) { return u }
+        return card.url.flatMap(URL.init(string:))
+    }
     var body: some View {
-        if let url, let link = URL(string: url) {
-            Link(destination: link) { Image(systemName: "arrow.up.right.square") }
+        if let target {
+            Link(destination: target) { Image(systemName: "arrow.up.right.square") }
                 .help("Open in Spotify")
         }
     }
