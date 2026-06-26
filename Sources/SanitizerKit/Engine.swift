@@ -77,8 +77,8 @@ public enum Engine {
 
     private static var planCacheURL: URL { Config.home.appendingPathComponent("last-plan.json") }
 
-    public static func cachePlan(_ plan: Plan) {
-        let cached = CachedPlan(plan: plan, scannedAt: Date())
+    public static func cachePlan(_ plan: Plan, scannedAt: Date = Date()) {
+        let cached = CachedPlan(plan: plan, scannedAt: scannedAt)
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted]
         guard let data = try? encoder.encode(cached) else { return }

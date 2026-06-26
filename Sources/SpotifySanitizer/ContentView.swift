@@ -152,7 +152,8 @@ struct PlanView: View {
                     section("Remove — \(plan.removals.count) to unlike",
                             ids: plan.removals.map(\.id), minWidth: 340) {
                         ForEach(plan.removals) { r in
-                            CardRow(entryID: r.id, card: r.card, reason: r.reason, accent: .red)
+                            CardRow(entryID: r.id, card: r.card, reason: r.reason, accent: .red,
+                                    actionLabel: "Unlike") { await model.doRemoval(r) }
                         }
                     }
                 }
@@ -275,6 +276,8 @@ struct CardRow: View {
     let card: Card
     let reason: String
     let accent: Color
+    var actionLabel: String? = nil
+    var onDo: (() async -> Void)? = nil
 
     var body: some View {
         HStack(spacing: 10) {
@@ -291,6 +294,9 @@ struct CardRow: View {
             Spacer(minLength: 8)
             Text(card.durationFormatted).font(.callout.monospacedDigit()).foregroundStyle(.secondary)
             SpotifyLink(card: card)
+            if let actionLabel, let onDo {
+                DoButton(id: entryID, label: actionLabel, action: onDo)
+            }
         }
         .opacity(model.included(entryID) ? 1 : 0.4)
         .cell(accent)
@@ -300,7 +306,10 @@ struct CardRow: View {
 // One partially-liked album: cover + ratio header, then the full tracklist with
 // missing tracks tickable and already-liked tracks shown for context.
 struct AlbumCompletionView: View {
+    @EnvironmentObject var model: AppModel
     let completion: Plan.AlbumCompletion
+
+    private var selectedCount: Int { completion.missing.filter { model.included($0.id) }.count }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -315,6 +324,9 @@ struct AlbumCompletionView: View {
                         .font(.caption).foregroundStyle(.secondary)
                 }
                 Spacer()
+                DoButton(id: completion.id, label: "Add (\(selectedCount))", disabled: selectedCount == 0) {
+                    await model.doCompletion(completion)
+                }
             }
             VStack(spacing: 0) {
                 ForEach(completion.tracks) { AlbumTrackRow(track: $0) }
@@ -371,6 +383,8 @@ struct ReplacementRow: View {
                 line(replacement.alternative, symbol: "checkmark.circle.fill", color: .green)
                 Text(replacement.reason).font(.caption2).foregroundStyle(.tertiary).lineLimit(1)
             }
+            Spacer(minLength: 8)
+            DoButton(id: entryID, label: "Replace") { await model.doReplacement(replacement) }
         }
         .opacity(model.included(entryID) ? 1 : 0.4)
         .cell(.orange)
@@ -398,6 +412,26 @@ struct ExplicitTag: View {
         Text("E").font(.caption2.bold())
             .padding(.horizontal, 4).padding(.vertical, 1)
             .background(.secondary.opacity(0.25)).clipShape(RoundedRectangle(cornerRadius: 3))
+    }
+}
+
+// Per-item "do this one now" button; shows a spinner while it runs and is
+// disabled while any item is being applied.
+struct DoButton: View {
+    @EnvironmentObject var model: AppModel
+    let id: UUID
+    let label: String
+    var disabled: Bool = false
+    let action: () async -> Void
+
+    var body: some View {
+        if model.workingItem == id {
+            ProgressView().controlSize(.small).frame(width: 64)
+        } else {
+            Button(label) { Task { await action() } }
+                .buttonStyle(.bordered).controlSize(.small)
+                .disabled(disabled || model.workingItem != nil)
+        }
     }
 }
 

@@ -14,13 +14,16 @@ final class AppModel: ObservableObject {
     @Published var findAlternatives = false
     @Published var clientIDInput = ""
     @Published var excluded: Set<UUID> = []   // entries the user unticked
+    @Published var workingItem: UUID?         // a single item being applied right now
     @Published var lastLog: URL?
     @Published var scannedAt: Date?           // when the shown plan was built
+
+    private let demo = CommandLine.arguments.contains("--demo")
 
     init() {
         lastLog = Engine.latestLog
         // --demo: load a fixture plan (no network) for UI work across restarts.
-        if CommandLine.arguments.contains("--demo") {
+        if demo {
             loggedIn = true
             clientIDSet = true
             plan = Engine.samplePlan()
@@ -107,8 +110,11 @@ final class AppModel: ObservableObject {
     func apply() async {
         let ids = selectedIDs()
         await run("Applying changes…") {
-            let log = try await Engine.apply(removeIDs: ids.remove, addIDs: ids.add)
-            self.lastLog = log
+            if self.demo {
+                try? await Task.sleep(nanoseconds: 600_000_000)
+            } else {
+                self.lastLog = try await Engine.apply(removeIDs: ids.remove, addIDs: ids.add)
+            }
             self.notice = "Applied: \(ids.remove.count) unliked, \(ids.add.count) liked."
             self.plan = nil
             self.scannedAt = nil
@@ -123,6 +129,57 @@ final class AppModel: ObservableObject {
             self.notice = "Undone: \(r.reliked) re-liked, \(r.unliked) unliked."
             self.lastLog = nil
         }
+    }
+
+    // MARK: per-item actions (work through the list one at a time)
+
+    func doRemoval(_ removal: Plan.Removal) async {
+        await perform(removal.id, remove: [removal.card.id], add: [],
+                      done: "Unliked “\(removal.card.title)”") {
+            self.plan?.removals.removeAll { $0.id == removal.id }
+        }
+    }
+
+    func doReplacement(_ replacement: Plan.Replacement) async {
+        await perform(replacement.id, remove: [replacement.dead.id], add: [replacement.alternative.id],
+                      done: "Replaced “\(replacement.dead.title)”") {
+            self.plan?.replacements.removeAll { $0.id == replacement.id }
+        }
+    }
+
+    func doCompletion(_ completion: Plan.AlbumCompletion) async {
+        let ids = completion.missing.filter { included($0.id) }.map { $0.card.id }
+        guard !ids.isEmpty else { return }
+        await perform(completion.id, remove: [], add: ids,
+                      done: "Added \(ids.count) to “\(completion.album)”") {
+            self.plan?.completions.removeAll { $0.id == completion.id }
+        }
+    }
+
+    private func perform(_ itemID: UUID, remove: [String], add: [String],
+                         done: String, mutate: @escaping () -> Void) async {
+        workingItem = itemID
+        error = nil; notice = nil; rateLimitedUntil = nil
+        do {
+            if demo {
+                try? await Task.sleep(nanoseconds: 400_000_000)   // show the spinner
+            } else {
+                lastLog = try await Engine.apply(removeIDs: remove, addIDs: add)
+            }
+            mutate()
+            notice = done
+            if let plan, !plan.isEmpty {
+                Engine.cachePlan(plan, scannedAt: scannedAt ?? Date())
+            } else {
+                plan = nil; scannedAt = nil; Engine.clearCachedPlan()
+            }
+        } catch let api as ApiError {
+            if case .rateLimited(let seconds) = api { rateLimitedUntil = Date().addingTimeInterval(Double(seconds)) }
+            else { error = api.errorDescription }
+        } catch {
+            self.error = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
+        }
+        workingItem = nil
     }
 
     private func run(_ label: String, _ work: @escaping () async throws -> Void) async {
