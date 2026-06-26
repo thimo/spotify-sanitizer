@@ -159,7 +159,7 @@ struct SettingsView: View {
                     Stepper("Skits ≤ \(model.skitMaxSeconds)s", value: $model.skitMaxSeconds, in: 30...150, step: 5)
                 }
             } header: {
-                Text("Album completion").font(.headline)
+                Text("Album completion").font(.headline).padding(.top, 4)
             }
             Section {
                 Toggle("Remove unplayable", isOn: $model.dropUnplayable)
@@ -170,7 +170,7 @@ struct SettingsView: View {
                         .help("If no exact ISRC match, try a title/artist match. May be a different version.")
                 }
             } header: {
-                Text("Unplayable tracks").font(.headline)
+                Text("Unplayable tracks").font(.headline).padding(.top, 12)
             }
             Section {
                 HStack {
@@ -189,7 +189,7 @@ struct SettingsView: View {
                 Text("Re-authorize if Spotify refuses changes or you changed permissions.")
                     .font(.caption).foregroundStyle(.secondary)
             } header: {
-                Text("Account").font(.headline)
+                Text("Account").font(.headline).padding(.top, 12)
             }
 
             Text("Changes apply on the next Scan.")
