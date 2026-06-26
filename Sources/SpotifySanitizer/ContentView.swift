@@ -178,10 +178,13 @@ struct SettingsView: View {
                         .foregroundStyle(model.loggedIn ? .green : .secondary)
                     Text(model.loggedIn ? "Logged in" : "Not logged in")
                     Spacer()
-                    Button("Log in again") { Task { await model.login() } }
+                }
+                HStack {
+                    Button("Re-authorize") { Task { await model.login() } }
                     if model.loggedIn {
                         Button("Log out") { model.logout() }
                     }
+                    Spacer()
                 }
                 Text("Re-authorize if Spotify refuses changes or you changed permissions.")
                     .font(.caption).foregroundStyle(.secondary)
