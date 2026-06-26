@@ -307,7 +307,10 @@ struct AlbumCompletionView: View {
             HStack(spacing: 10) {
                 Artwork(url: completion.tracks.first?.card.image)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(completion.album).font(.subheadline.bold()).lineLimit(1)
+                    Text(completion.album).font(.headline).lineLimit(1)
+                    if let artist = completion.tracks.first?.card.artist, !artist.isEmpty {
+                        Text(artist).font(.subheadline).foregroundStyle(.secondary).lineLimit(1)
+                    }
                     Text("you like \(completion.likedCount) of \(completion.total) — adding the \(completion.missing.count) missing")
                         .font(.caption).foregroundStyle(.secondary)
                 }
@@ -337,11 +340,16 @@ struct AlbumTrackRow: View {
             Text(track.card.trackNumber.map(String.init) ?? "")
                 .font(.callout.monospacedDigit()).foregroundStyle(.secondary)
                 .frame(width: 20, alignment: .trailing)
-            if track.card.explicit { ExplicitTag() }
-            Text(track.card.title)
-                .foregroundStyle(track.liked ? .secondary : .primary)
-                .lineLimit(1)
-            Spacer()
+            VStack(alignment: .leading, spacing: 1) {
+                Text(track.card.title)
+                    .foregroundStyle(track.liked ? .secondary : .primary)
+                    .lineLimit(1)
+                HStack(spacing: 5) {
+                    if track.card.explicit { ExplicitTag() }
+                    Text(track.card.artist).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                }
+            }
+            Spacer(minLength: 8)
             Text(track.card.durationFormatted).font(.callout.monospacedDigit()).foregroundStyle(.secondary)
             SpotifyLink(card: track.card)
         }
