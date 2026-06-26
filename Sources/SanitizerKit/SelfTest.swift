@@ -74,6 +74,27 @@ public extension Engine {
                                 saved(name: "Classic - 2011 Remaster", addedAt: "2021-01-01T00:00:00Z", id: "remast")])
         check(plan.removals.count == 1, "remaster did not collapse (\(plan.removals.count))")
 
+        // dedup keeps the copy from an album you like more of (affinity tie-break)
+        plan = await buildPlan([
+            saved(name: "Hit", album: "Collected", id: "comp"),   // album "Collected": 1 liked
+            saved(name: "Hit", album: "Debut", id: "alb"),        // album "Debut": 2 liked (below)
+            saved(name: "Deep Cut", album: "Debut", id: "deep")
+        ])
+        check(plan.removals.map { $0.card.id } == ["comp"], "affinity: should keep the Debut copy you like more of")
+
+        // relinked track: id/uri/link target the saved (linked_from) id, not the playable one
+        let relinked: [String: Any] = ["added_at": "2020-01-01T00:00:00Z", "track": [
+            "id": "PLAYABLE", "name": "Show", "duration_ms": 217_496,
+            "uri": "spotify:track:PLAYABLE",
+            "linked_from": ["id": "SAVED", "uri": "spotify:track:SAVED"],
+            "artists": [["name": "Aafke Romeijn"]],
+            "album": ["id": "alb", "name": "Versplintering Op Rechts", "album_type": "album", "total_tracks": 6]
+        ] as [String: Any]]
+        let rt = Track(relinked)
+        check(rt.id == "SAVED", "relink: id should be the saved (linked_from) id, got \(rt.id ?? "nil")")
+        check(rt.uri == "spotify:track:SAVED", "relink: uri should be the saved id")
+        check(rt.card.url == "https://open.spotify.com/track/SAVED", "relink: link should target the saved id")
+
         // skit detection
         check(Track(saved(name: "Interlude")).isSkit(), "skit: title not detected")
         check(Track(saved(name: "Short bit", durationMs: 30_000)).isSkit(), "skit: short not detected")

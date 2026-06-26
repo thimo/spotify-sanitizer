@@ -44,8 +44,13 @@ struct Track {
     init(_ saved: [String: Any]) {
         let t = (saved["track"] as? [String: Any]) ?? saved
         let album = (t["album"] as? [String: Any]) ?? [:]
+        // With market=from_token Spotify may relink a saved track to a playable
+        // substitute; `linked_from` then holds the id the user actually saved.
+        // Library ops (unlike) and links must target that saved id, not the
+        // relinked one — otherwise we'd open/remove the wrong track.
+        let linkedFrom = t["linked_from"] as? [String: Any]
 
-        id = t["id"] as? String
+        id = (linkedFrom?["id"] as? String) ?? (t["id"] as? String)
         name = (t["name"] as? String) ?? ""
         artists = ((t["artists"] as? [[String: Any]]) ?? []).compactMap { $0["name"] as? String }
         albumID = album["id"] as? String
@@ -59,16 +64,12 @@ struct Track {
         // is_playable only appears when a market is supplied; treat missing as playable.
         playable = (t["is_playable"] as? Bool) ?? true
         addedAt = saved["added_at"] as? String
-        uri = t["uri"] as? String
+        uri = (linkedFrom?["uri"] as? String) ?? (t["uri"] as? String)
 
         imageURL = Track.pickImage(album["images"] as? [[String: Any]])
-        if let url = (t["external_urls"] as? [String: Any])?["spotify"] as? String {
-            spotifyURL = url
-        } else if let id = t["id"] as? String {
-            spotifyURL = "https://open.spotify.com/track/\(id)"
-        } else {
-            spotifyURL = nil
-        }
+        let externalURL = (linkedFrom?["external_urls"] as? [String: Any])?["spotify"] as? String
+            ?? (t["external_urls"] as? [String: Any])?["spotify"] as? String
+        spotifyURL = externalURL ?? id.map { "https://open.spotify.com/track/\($0)" }
     }
 
     var primaryArtist: String { artists.first ?? "" }

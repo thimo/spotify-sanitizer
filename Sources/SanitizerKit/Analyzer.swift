@@ -83,28 +83,38 @@ struct Analyzer {
 
     // Collapse "same recording, different release" clusters down to one keeper.
     private func dedupe(_ tracks: [Track], _ plan: inout Plan) -> [Track] {
+        // How many liked tracks you have per album — used as a keeper tie-break
+        // so we keep the copy from an album you're already collecting.
+        var albumLikes: [String: Int] = [:]
+        for t in tracks { if let a = t.albumID { albumLikes[a, default: 0] += 1 } }
+
         var kept: [Track] = []
         for (_, cluster) in Dictionary(grouping: tracks, by: { $0.fuzzyKey }) {
             guard cluster.count > 1 else { kept.append(cluster[0]); continue }
-            let keeper = cluster.min { rankKey($0) < rankKey($1) }!
+            let keeper = cluster.min { rankKey($0, albumLikes) < rankKey($1, albumLikes) }!
             kept.append(keeper)
             for loser in cluster where loser.id != keeper.id {
-                plan.remove(loser, reason: duplicateReason(loser, keeper), keeper: keeper)
+                plan.remove(loser, reason: duplicateReason(loser, keeper, albumLikes), keeper: keeper)
             }
         }
         return kept
     }
 
+    private func albumAffinity(_ t: Track, _ albumLikes: [String: Int]) -> Int {
+        t.albumID.flatMap { albumLikes[$0] } ?? 0
+    }
+
     // Ordered keeper rules: playable > explicit > album>single>compilation >
-    // earliest added_at.
-    private func rankKey(_ t: Track) -> (Int, Int, Int, String) {
+    // album you like more of > earliest added_at.
+    private func rankKey(_ t: Track, _ albumLikes: [String: Int]) -> (Int, Int, Int, Int, String) {
         (t.playable ? 0 : 1,
          t.explicit ? 0 : 1,
          Analyzer.albumTypeRank[t.albumType ?? ""] ?? 9,
+         -albumAffinity(t, albumLikes),   // more liked from this album = better (lower)
          t.addedAt ?? "")
     }
 
-    private func duplicateReason(_ loser: Track, _ keeper: Track) -> String {
+    private func duplicateReason(_ loser: Track, _ keeper: Track, _ albumLikes: [String: Int]) -> String {
         if !loser.explicit && keeper.explicit {
             return "duplicate — clean version, keeping explicit"
         }
@@ -112,6 +122,9 @@ struct Analyzer {
         let keeperRank = Analyzer.albumTypeRank[keeper.albumType ?? ""] ?? 9
         if loserRank > keeperRank {
             return "duplicate — \(loser.albumType ?? "?") version, keeping \(keeper.albumType ?? "?")"
+        }
+        if albumAffinity(keeper, albumLikes) > albumAffinity(loser, albumLikes) {
+            return "duplicate — keeping the copy from an album you like more of"
         }
         return "duplicate — keeping the one you added first"
     }
