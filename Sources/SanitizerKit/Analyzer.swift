@@ -5,9 +5,13 @@ import Foundation
 struct Analyzer {
     struct Options {
         var completionThreshold = 0.70
-        var skitMaxSeconds = 60
+        // Tracks at/under this length count as skits: excluded from completion
+        // math and never proposed. 90s catches short interludes (Hoed Rits 62s,
+        // Vlammetjes 90s); the cost is that genuinely short songs are skipped too.
+        var skitMaxSeconds = 90
         var dropUnplayable = true
         var findAlternatives = false
+        var fuzzyAlternatives = false
         var completeAlbums = true
     }
 
@@ -55,18 +59,21 @@ struct Analyzer {
             return playable
         }
 
-        // Look up ISRC alternatives concurrently.
+        // Look up alternatives concurrently.
         report(ScanProgress(label: "Finding alternatives", done: 0, total: dead.count))
+        let fuzzy = options.fuzzyAlternatives
         let found = try await boundedMap(dead, limit: Analyzer.fetchConcurrency, onProgress: { done in
             self.report(ScanProgress(label: "Finding alternatives", done: done, total: dead.count))
         }) { track in
-            (track, try await library.findAlternative(track))
+            (track, try await library.findAlternative(track, fuzzy: fuzzy))
         }
 
-        for (track, alt) in found {
-            if let alt {
-                plan.replace(track, with: alt,
-                             reason: "unplayable in your market — same recording (ISRC) plays here")
+        for (track, result) in found {
+            if let result {
+                let reason = result.fuzzy
+                    ? "unplayable — likely the same song (verify)"
+                    : "unplayable in your market — same recording (ISRC) plays here"
+                plan.replace(track, with: result.track, reason: reason, fuzzy: result.fuzzy)
             } else {
                 plan.remove(track, reason: "unplayable in your market")
             }

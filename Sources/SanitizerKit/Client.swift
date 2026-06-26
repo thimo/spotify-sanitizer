@@ -63,6 +63,32 @@ struct Client {
         return items
     }
 
+    // Offset-paginated fetch: read page 0 to learn `total`, then fetch the rest
+    // concurrently (bounded) instead of chasing `next` cursors one by one.
+    // Returns items in order. Reports (done, total) so callers show a real bar.
+    func pagedConcurrent(_ path: String, _ params: [String: String] = [:],
+                         pageSize: Int = 50, concurrency: Int = 5,
+                         onProgress: ((_ done: Int, _ total: Int) -> Void)? = nil) async throws -> [[String: Any]] {
+        func page(_ offset: Int) async throws -> (items: [[String: Any]], total: Int) {
+            let merged = params.merging(["limit": "\(pageSize)", "offset": "\(offset)"]) { _, new in new }
+            let json = try await request("GET", url: buildURL(path, merged))
+            let items = (json["items"] as? [[String: Any]]) ?? []
+            return (items, (json["total"] as? Int) ?? items.count)
+        }
+
+        let first = try await page(0)
+        onProgress?(first.items.count, first.total)
+        if first.total <= pageSize { return first.items }
+
+        let offsets = Array(stride(from: pageSize, to: first.total, by: pageSize))
+        let rest = try await boundedMap(offsets, limit: concurrency, onProgress: { done in
+            onProgress?(min(first.items.count + done * pageSize, first.total), first.total)
+        }) { offset in
+            try await page(offset).items
+        }
+        return first.items + rest.flatMap { $0 }
+    }
+
     // MARK: - internals
 
     private func buildURL(_ path: String, _ params: [String: String] = [:]) -> URL {
@@ -88,13 +114,17 @@ struct Client {
 
         switch http.statusCode {
         case 200..<300:
+            RateLimit.clearIfPresent()   // a success means the cooldown is over
             if data.isEmpty { return [:] }
             return (try? JSONSerialization.jsonObject(with: data) as? [String: Any]) ?? [:]
         case 429:
             let retryAfter = Int(http.value(forHTTPHeaderField: "Retry-After") ?? "") ?? 1
             Log.net("429 on \(url.path); Retry-After \(retryAfter)s")
             // Auto-retry only short cool-downs; don't hang for minutes/hours.
-            guard retryAfter <= Client.maxAutoRetryWait else { throw ApiError.rateLimited(retryAfter) }
+            guard retryAfter <= Client.maxAutoRetryWait else {
+                RateLimit.record(retryAfter: retryAfter)
+                throw ApiError.rateLimited(retryAfter)
+            }
             try await Task.sleep(nanoseconds: UInt64(retryAfter + 1) * 1_000_000_000)
             return try await request(method, url: url, body: body)
         case 401:

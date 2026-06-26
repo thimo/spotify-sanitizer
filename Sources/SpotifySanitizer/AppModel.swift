@@ -35,6 +35,7 @@ final class AppModel: ObservableObject {
             plan = cached.plan
             scannedAt = cached.scannedAt
         }
+        rateLimitedUntil = Engine.rateLimitedUntil   // resume a cooldown countdown
     }
 
     var isBusy: Bool { busy != nil }
@@ -99,6 +100,10 @@ final class AppModel: ObservableObject {
     }
 
     func scan() async {
+        if let until = Engine.rateLimitedUntil {
+            rateLimitedUntil = until   // still cooling down — don't fire a doomed request
+            return
+        }
         await run("Scanning your library…") {
             let plan = try await Engine.scan(findAlternatives: self.findAlternatives) { p in
                 Task { @MainActor in self.progress = p }

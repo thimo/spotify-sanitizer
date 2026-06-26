@@ -5,6 +5,8 @@ import Foundation
 public enum Engine {
     public static func loggedIn() -> Bool { Auth.loggedIn() }
     public static func clientIDIsSet() -> Bool { (try? Config.clientID()) != nil }
+    // A persisted rate-limit cooldown deadline, if one is still in effect.
+    public static var rateLimitedUntil: Date? { RateLimit.until }
     public static let redirectURI = Config.defaultRedirectURI
 
     public static func saveClientID(_ id: String) {
@@ -26,6 +28,7 @@ public enum Engine {
         skitMaxSeconds: Int = 60,
         dropUnplayable: Bool = true,
         findAlternatives: Bool = false,
+        fuzzyAlternatives: Bool = false,
         completeAlbums: Bool = true,
         progress: ((ScanProgress) -> Void)? = nil
     ) async throws -> Plan {
@@ -35,8 +38,8 @@ public enum Engine {
 
         progress?(ScanProgress(label: "Fetching liked songs", done: 0, total: 0))
         let fetchStart = Date()
-        let tracks = try await library.likedTracks { count in
-            progress?(ScanProgress(label: "Fetching liked songs", done: count, total: 0))
+        let tracks = try await library.likedTracks { done, total in
+            progress?(ScanProgress(label: "Fetching liked songs", done: done, total: total))
         }
         Log.scan("fetched \(tracks.count) liked tracks in \(Log.since(fetchStart))s")
 
@@ -45,6 +48,7 @@ public enum Engine {
         options.skitMaxSeconds = skitMaxSeconds
         options.dropUnplayable = dropUnplayable
         options.findAlternatives = findAlternatives
+        options.fuzzyAlternatives = fuzzyAlternatives
         options.completeAlbums = completeAlbums
 
         let analyzeStart = Date()
@@ -136,7 +140,7 @@ public extension Engine {
         plan.replacements = [
             .init(dead: card("dead2", "Santa Esmeralda", "Don't Let Me Be Misunderstood", "Kill Bill OST (PA)", 628),
                   alternative: card("alt2", "Santa Esmeralda", "Don't Let Me Be Misunderstood", "House Of The Rising Sun", 628),
-                  reason: "unplayable in your market — same recording (ISRC) plays here")
+                  reason: "unplayable in your market — same recording (ISRC) plays here", fuzzy: false)
         ]
         func entry(_ num: Int, _ id: String, _ title: String, _ secs: Int, liked: Bool, play: String = "4cOdK2wGLETKBW3PvgPWqT") -> Plan.AlbumTrack {
             Plan.AlbumTrack(card: card(id, "Makaveli", title, "The Don Killuminati", secs, explicit: true, num: num, play: play), liked: liked)

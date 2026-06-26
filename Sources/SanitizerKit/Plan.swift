@@ -40,7 +40,8 @@ public struct Plan: Codable {
         public var dead: Card
         public var alternative: Card
         public var reason: String
-        private enum CodingKeys: String, CodingKey { case dead, alternative, reason }
+        public var fuzzy: Bool       // matched by title/artist, not ISRC — verify
+        private enum CodingKeys: String, CodingKey { case dead, alternative, reason, fuzzy }
     }
     // One track in an album's full tracklist; `liked` means it's already in your
     // library (context), otherwise it's a proposed addition (tickable).
@@ -75,8 +76,8 @@ public struct Plan: Codable {
     mutating func remove(_ track: Track, reason: String, keeper: Track? = nil) {
         removals.append(Removal(card: track.card, reason: reason, keeper: keeper?.card))
     }
-    mutating func replace(_ dead: Track, with alternative: Track, reason: String) {
-        replacements.append(Replacement(dead: dead.card, alternative: alternative.card, reason: reason))
+    mutating func replace(_ dead: Track, with alternative: Track, reason: String, fuzzy: Bool = false) {
+        replacements.append(Replacement(dead: dead.card, alternative: alternative.card, reason: reason, fuzzy: fuzzy))
     }
     // `tracks` is the full non-skit album tracklist in order; `likedIDs` flags
     // which are already in the library.
