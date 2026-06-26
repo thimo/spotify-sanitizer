@@ -181,6 +181,14 @@ final class AppModel: ObservableObject {
         }
     }
 
+    // Drop the dead track without adding the alternative.
+    func unlikeDead(_ replacement: Plan.Replacement) async {
+        await perform(replacement.id, remove: [replacement.dead.id], add: [],
+                      done: "Unliked “\(replacement.dead.title)”") {
+            self.plan?.replacements.removeAll { $0.id == replacement.id }
+        }
+    }
+
     func doCompletion(_ completion: Plan.AlbumCompletion) async {
         let ids = completion.missing.filter { included($0.id) }.map { $0.card.id }
         guard !ids.isEmpty else { return }

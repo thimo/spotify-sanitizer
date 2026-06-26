@@ -128,10 +128,10 @@ public extension Engine {
 
         var plan = Plan()
         plan.removals = [
-            .init(card: card("dup1", "Daft Punk", "Get Lucky", "Random Access Memories", 248, play: "69kOkLUCkxIZYexIgSG8rq"),
-                  reason: "duplicate — keeping one copy",
+            .init(card: card("dup1", "Daft Punk", "Get Lucky", "Now That's What I Call Music 86", 248, play: "69kOkLUCkxIZYexIgSG8rq"),
+                  reason: "duplicate — compilation version, keeping album",
                   keeper: card("dup1k", "Daft Punk", "Get Lucky", "Random Access Memories", 369, play: "69kOkLUCkxIZYexIgSG8rq")),
-            .init(card: card("cln1", "Kendrick Lamar", "DNA.", "DAMN.", 185, play: "6HZILIRieu8S0iqY8kIKhj"),
+            .init(card: card("cln1", "Kendrick Lamar", "DNA.", "DAMN. (Clean)", 185, play: "6HZILIRieu8S0iqY8kIKhj"),
                   reason: "duplicate — clean version, keeping explicit",
                   keeper: card("exp1", "Kendrick Lamar", "DNA.", "DAMN.", 185, explicit: true, play: "6HZILIRieu8S0iqY8kIKhj")),
             .init(card: card("dead1", "De La Soul", "Saturdays", "Swing", 197),

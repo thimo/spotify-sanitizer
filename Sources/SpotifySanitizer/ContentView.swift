@@ -191,11 +191,24 @@ struct PlanView: View {
             VStack(alignment: .leading, spacing: 22) {
                 statsHeader
                 if !plan.removals.isEmpty {
-                    section("Remove — \(plan.removals.count) to unlike",
-                            ids: plan.removals.map(\.id), minWidth: 340) {
-                        ForEach(plan.removals) { r in
-                            CardRow(entryID: r.id, card: r.card, reason: r.reason, accent: .red,
-                                    actionLabel: "Unlike") { await model.doRemoval(r) }
+                    VStack(alignment: .leading, spacing: 16) {
+                        SectionHeader(title: "Remove — \(plan.removals.count) to unlike",
+                                      ids: plan.removals.map(\.id))
+                        ForEach(removalGroups, id: \.reason) { group in
+                            let hasKeeper = group.items.first?.keeper != nil
+                            VStack(alignment: .leading, spacing: 8) {
+                                subHeader(group.reason, ids: group.items.map(\.id))
+                                LazyVGrid(columns: gridColumns(hasKeeper ? 440 : 340), spacing: 10) {
+                                    ForEach(group.items) { r in
+                                        if r.keeper != nil {
+                                            DuplicateRow(removal: r)
+                                        } else {
+                                            CardRow(entryID: r.id, card: r.card, reason: "", accent: .red,
+                                                    actionLabel: "Unlike") { await model.doRemoval(r) }
+                                        }
+                                    }
+                                }
+                            }
                         }
                     }
                 }
@@ -228,9 +241,30 @@ struct PlanView: View {
                                         @ViewBuilder content: () -> Content) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             SectionHeader(title: title, ids: ids)
-            LazyVGrid(columns: [GridItem(.adaptive(minimum: minWidth), spacing: 10, alignment: .top)], spacing: 10) {
-                content()
-            }
+            LazyVGrid(columns: gridColumns(minWidth), spacing: 10) { content() }
+        }
+    }
+
+    private func gridColumns(_ minWidth: CGFloat) -> [GridItem] {
+        [GridItem(.adaptive(minimum: minWidth), spacing: 10, alignment: .top)]
+    }
+
+    // Removals grouped by their reason, biggest group first.
+    private var removalGroups: [(reason: String, items: [Plan.Removal])] {
+        Dictionary(grouping: plan.removals, by: { $0.reason })
+            .map { (reason: $0.key, items: $0.value) }
+            .sorted { $0.items.count > $1.items.count }
+    }
+
+    // Lighter header for a sub-group, with its own select-all/none.
+    private func subHeader(_ title: String, ids: [UUID]) -> some View {
+        HStack(spacing: 8) {
+            Text(title).font(.subheadline.weight(.medium)).foregroundStyle(.secondary)
+            Text("\(ids.count)").font(.caption.monospacedDigit()).foregroundStyle(.tertiary)
+            Spacer()
+            let allOn = model.allIncluded(ids)
+            Button(allOn ? "Select none" : "Select all") { model.setIncluded(ids, !allOn) }
+                .font(.caption).buttonStyle(.borderless)
         }
     }
 
@@ -339,9 +373,12 @@ struct CardRow: View {
                 Text(card.title).font(.body.weight(.semibold)).lineLimit(1)
                 HStack(spacing: 5) {
                     if card.explicit { ExplicitTag() }
-                    Text(card.artist).font(.callout).foregroundStyle(.secondary).lineLimit(1)
+                    Text(card.album.isEmpty ? card.artist : "\(card.artist) · \(card.album)")
+                        .font(.callout).foregroundStyle(.secondary).lineLimit(1)
                 }
-                Text(reason).font(.caption2).foregroundStyle(.tertiary).lineLimit(1)
+                if !reason.isEmpty {
+                    Text(reason).font(.caption2).foregroundStyle(.tertiary).lineLimit(1)
+                }
             }
             Spacer(minLength: 8)
             Text(card.durationFormatted).font(.callout.monospacedDigit()).foregroundStyle(.secondary)
@@ -426,6 +463,49 @@ struct AlbumTrackRow: View {
     }
 }
 
+// A duplicate: the copy to unlike (✗) over the copy being kept (✓), both with
+// album so the difference is visible.
+struct DuplicateRow: View {
+    @EnvironmentObject var model: AppModel
+    let removal: Plan.Removal
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 10) {
+            CheckBox(on: model.included(removal.id))
+            VStack(alignment: .leading, spacing: 6) {
+                trackLine(removal.card, symbol: "xmark.circle.fill", color: .red)
+                if let keeper = removal.keeper {
+                    trackLine(keeper, symbol: "checkmark.circle.fill", color: .green)
+                }
+            }
+            Spacer(minLength: 8)
+            DoButton(id: removal.id, label: "Unlike") { await model.doRemoval(removal) }
+        }
+        .opacity(model.included(removal.id) ? 1 : 0.4)
+        .cell(.red)
+        .contentShape(Rectangle())
+        .onTapGesture { model.toggle(removal.id) }
+    }
+
+    private func trackLine(_ card: Card, symbol: String, color: Color) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: symbol).foregroundStyle(color)
+            Artwork(url: card.image)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(card.title).font(.body.weight(.semibold)).lineLimit(1)
+                HStack(spacing: 5) {
+                    if card.explicit { ExplicitTag() }
+                    Text(card.album.isEmpty ? card.artist : "\(card.artist) · \(card.album)")
+                        .font(.callout).foregroundStyle(.secondary).lineLimit(1)
+                }
+            }
+            Spacer(minLength: 8)
+            Text(card.durationFormatted).font(.callout.monospacedDigit()).foregroundStyle(.secondary)
+            SpotifyLink(card: card)
+        }
+    }
+}
+
 struct ReplacementRow: View {
     @EnvironmentObject var model: AppModel
     let entryID: UUID
@@ -448,7 +528,16 @@ struct ReplacementRow: View {
                 }
             }
             Spacer(minLength: 8)
-            DoButton(id: entryID, label: "Replace") { await model.doReplacement(replacement) }
+            if model.workingItem == entryID {
+                ProgressView().controlSize(.small).frame(width: 120)
+            } else {
+                HStack(spacing: 6) {
+                    Button("Unlike") { Task { await model.unlikeDead(replacement) } }
+                        .controlSize(.small).disabled(model.workingItem != nil)
+                    Button("Replace") { Task { await model.doReplacement(replacement) } }
+                        .controlSize(.small).buttonStyle(.borderedProminent).disabled(model.workingItem != nil)
+                }
+            }
         }
         .opacity(model.included(entryID) ? 1 : 0.4)
         .cell(.orange)
@@ -464,12 +553,16 @@ struct ReplacementRow: View {
                 Text(card.title).font(.body.weight(.semibold)).lineLimit(1)
                 HStack(spacing: 5) {
                     if card.explicit { ExplicitTag() }
-                    Text(card.artist).font(.callout).foregroundStyle(.secondary).lineLimit(1)
+                    Text(albumLine(card)).font(.callout).foregroundStyle(.secondary).lineLimit(1)
                 }
             }
             Spacer(minLength: 8)
             SpotifyLink(card: card)
         }
+    }
+
+    private func albumLine(_ card: Card) -> String {
+        card.album.isEmpty ? card.artist : "\(card.artist) · \(card.album)"
     }
 }
 
