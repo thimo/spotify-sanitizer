@@ -145,62 +145,71 @@ struct PlanView: View {
     let plan: Plan
 
     var body: some View {
-        List {
-            statsSection
-            if !plan.removals.isEmpty {
-                Section {
-                    ForEach(plan.removals) { r in
-                        CardRow(entryID: r.id, card: r.card, reason: r.reason, accent: .red)
+        ScrollView {
+            VStack(alignment: .leading, spacing: 22) {
+                statsHeader
+                if !plan.removals.isEmpty {
+                    section("Remove — \(plan.removals.count) to unlike",
+                            ids: plan.removals.map(\.id), minWidth: 340) {
+                        ForEach(plan.removals) { r in
+                            CardRow(entryID: r.id, card: r.card, reason: r.reason, accent: .red)
+                        }
                     }
-                } header: {
-                    SectionHeader(title: "Remove — \(plan.removals.count) to unlike",
-                                  ids: plan.removals.map(\.id))
+                }
+                if !plan.replacements.isEmpty {
+                    section("Replace — \(plan.replacements.count) unplayable",
+                            ids: plan.replacements.map(\.id), minWidth: 520) {
+                        ForEach(plan.replacements) { rep in
+                            ReplacementRow(entryID: rep.id, replacement: rep)
+                        }
+                    }
+                }
+                if !plan.completions.isEmpty {
+                    section("Add — \(plan.additionsCount) to complete albums",
+                            ids: plan.completions.flatMap { $0.missing.map(\.id) }, minWidth: 360) {
+                        ForEach(plan.completions) { completion in
+                            AlbumCompletionView(completion: completion)
+                        }
+                    }
                 }
             }
-            if !plan.replacements.isEmpty {
-                Section {
-                    ForEach(plan.replacements) { rep in
-                        ReplacementRow(entryID: rep.id, replacement: rep)
-                    }
-                } header: {
-                    SectionHeader(title: "Replace — \(plan.replacements.count) unplayable",
-                                  ids: plan.replacements.map(\.id))
-                }
-            }
-            if !plan.completions.isEmpty {
-                Section {
-                    ForEach(plan.completions) { completion in
-                        AlbumCompletionView(completion: completion)
-                    }
-                } header: {
-                    SectionHeader(title: "Add — \(plan.additionsCount) to complete albums",
-                                  ids: plan.completions.flatMap { $0.missing.map(\.id) })
-                }
+            .padding(20)
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+
+    // A section header plus an adaptive grid that flows into as many columns as
+    // the window width allows (min cell width tuned per section).
+    @ViewBuilder
+    private func section<Content: View>(_ title: String, ids: [UUID], minWidth: CGFloat,
+                                        @ViewBuilder content: () -> Content) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            SectionHeader(title: title, ids: ids)
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: minWidth), spacing: 10, alignment: .top)], spacing: 10) {
+                content()
             }
         }
     }
 
-    private var statsSection: some View {
-        Section {
-            let order = [("liked_tracks_scanned", "scanned"), ("duplicates_removed", "duplicates"),
-                         ("unplayable_removed", "unplayable"), ("unplayable_replaced", "replaced"),
-                         ("additions_suggested", "additions"), ("albums_kept", "albums")]
-            VStack(spacing: 6) {
-                HStack(spacing: 18) {
-                    ForEach(order, id: \.0) { key, label in
-                        VStack {
-                            Text("\(plan.stats[key] ?? 0)").font(.title3.monospacedDigit().bold())
-                            Text(label).font(.caption).foregroundStyle(.secondary)
-                        }
+    private var statsHeader: some View {
+        let order = [("liked_tracks_scanned", "scanned"), ("duplicates_removed", "duplicates"),
+                     ("unplayable_removed", "unplayable"), ("unplayable_replaced", "replaced"),
+                     ("additions_suggested", "additions"), ("albums_kept", "albums")]
+        return VStack(spacing: 6) {
+            HStack(spacing: 18) {
+                ForEach(order, id: \.0) { key, label in
+                    VStack {
+                        Text("\(plan.stats[key] ?? 0)").font(.title3.monospacedDigit().bold())
+                        Text(label).font(.caption).foregroundStyle(.secondary)
                     }
                 }
-                if let scannedAt = model.scannedAt {
-                    Text("Scanned \(Text(scannedAt, style: .relative)) ago — Scan again to refresh.")
-                        .font(.caption2).foregroundStyle(.secondary)
-                }
             }
-            .frame(maxWidth: .infinity)
+            if let scannedAt = model.scannedAt {
+                Text("Scanned \(Text(scannedAt, style: .relative)) ago — Scan again to refresh.")
+                    .font(.caption2).foregroundStyle(.secondary)
+            }
         }
+        .frame(maxWidth: .infinity)
     }
 }
 
@@ -211,7 +220,7 @@ struct SectionHeader: View {
 
     var body: some View {
         HStack {
-            Text(title)
+            Text(title).font(.headline)
             Spacer()
             let allOn = model.allIncluded(ids)
             Button(allOn ? "Select none" : "Select all") {
@@ -223,6 +232,20 @@ struct SectionHeader: View {
 }
 
 // MARK: - Rows
+
+// Card-style cell background used by every grid item.
+private struct CellBackground: ViewModifier {
+    let color: Color
+    func body(content: Content) -> some View {
+        content
+            .padding(10)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(color.opacity(0.08), in: RoundedRectangle(cornerRadius: 8))
+    }
+}
+extension View {
+    func cell(_ color: Color) -> some View { modifier(CellBackground(color: color)) }
+}
 
 struct Artwork: View {
     let url: String?
@@ -248,20 +271,20 @@ struct CardRow: View {
         HStack(spacing: 10) {
             Toggle("", isOn: model.binding(entryID)).labelsHidden()
             Artwork(url: card.image)
-            VStack(alignment: .leading, spacing: 2) {
-                HStack(spacing: 6) {
+            VStack(alignment: .leading, spacing: 1) {
+                Text(card.title).font(.body.weight(.semibold)).lineLimit(1)
+                HStack(spacing: 5) {
                     if card.explicit { ExplicitTag() }
-                    Text("\(card.artist) — \(card.title)").fontWeight(.medium).lineLimit(1)
+                    Text(card.artist).font(.callout).foregroundStyle(.secondary).lineLimit(1)
                 }
-                Text(reason).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                Text(reason).font(.caption2).foregroundStyle(.tertiary).lineLimit(1)
             }
-            Spacer()
-            Text(card.durationFormatted).font(.caption.monospacedDigit()).foregroundStyle(.secondary)
+            Spacer(minLength: 8)
+            Text(card.durationFormatted).font(.callout.monospacedDigit()).foregroundStyle(.secondary)
             SpotifyLink(card: card)
         }
-        .padding(.vertical, 2)
         .opacity(model.included(entryID) ? 1 : 0.4)
-        .listRowBackground(accent.opacity(0.045))
+        .cell(accent)
     }
 }
 
@@ -286,8 +309,7 @@ struct AlbumCompletionView: View {
             }
             .padding(.leading, 4)
         }
-        .padding(.vertical, 4)
-        .listRowBackground(Color.green.opacity(0.045))
+        .cell(.green)
     }
 }
 
@@ -308,7 +330,7 @@ struct AlbumTrackRow: View {
                 .foregroundStyle(track.liked ? .secondary : .primary)
                 .lineLimit(1)
             Spacer()
-            Text(track.card.durationFormatted).font(.caption.monospacedDigit()).foregroundStyle(.secondary)
+            Text(track.card.durationFormatted).font(.callout.monospacedDigit()).foregroundStyle(.secondary)
             SpotifyLink(card: track.card)
         }
         .padding(.vertical, 1)
@@ -333,17 +355,21 @@ struct ReplacementRow: View {
                 Text(replacement.reason).font(.caption).foregroundStyle(.secondary).lineLimit(1)
             }
         }
-        .padding(.vertical, 2)
         .opacity(model.included(entryID) ? 1 : 0.4)
-        .listRowBackground(Color.orange.opacity(0.05))
+        .cell(.orange)
     }
 
     private func column(_ card: Card, symbol: String, color: Color) -> some View {
         HStack(spacing: 8) {
             Image(systemName: symbol).foregroundStyle(color)
             Artwork(url: card.image)
-            if card.explicit { ExplicitTag() }
-            Text("\(card.artist) — \(card.title)").lineLimit(2)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(card.title).font(.callout.weight(.semibold)).lineLimit(1)
+                HStack(spacing: 5) {
+                    if card.explicit { ExplicitTag() }
+                    Text(card.artist).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                }
+            }
             Spacer(minLength: 4)
             SpotifyLink(card: card)
         }
