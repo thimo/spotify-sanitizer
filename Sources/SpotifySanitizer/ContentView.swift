@@ -158,7 +158,7 @@ struct PlanView: View {
                 }
                 if !plan.replacements.isEmpty {
                     section("Replace — \(plan.replacements.count) unplayable",
-                            ids: plan.replacements.map(\.id), minWidth: 520) {
+                            ids: plan.replacements.map(\.id), minWidth: 360) {
                         ForEach(plan.replacements) { rep in
                             ReplacementRow(entryID: rep.id, replacement: rep)
                         }
@@ -359,33 +359,29 @@ struct ReplacementRow: View {
         HStack(alignment: .top, spacing: 10) {
             Toggle("", isOn: model.binding(entryID)).labelsHidden()
             VStack(alignment: .leading, spacing: 6) {
-                HStack(spacing: 12) {
-                    column(replacement.dead, symbol: "xmark.circle.fill", color: .red)
-                    Image(systemName: "arrow.right").foregroundStyle(.secondary)
-                    column(replacement.alternative, symbol: "checkmark.circle.fill", color: .green)
-                }
-                Text(replacement.reason).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                line(replacement.dead, symbol: "xmark.circle.fill", color: .red)
+                line(replacement.alternative, symbol: "checkmark.circle.fill", color: .green)
+                Text(replacement.reason).font(.caption2).foregroundStyle(.tertiary).lineLimit(1)
             }
         }
         .opacity(model.included(entryID) ? 1 : 0.4)
         .cell(.orange)
     }
 
-    private func column(_ card: Card, symbol: String, color: Color) -> some View {
+    private func line(_ card: Card, symbol: String, color: Color) -> some View {
         HStack(spacing: 8) {
             Image(systemName: symbol).foregroundStyle(color)
             Artwork(url: card.image)
             VStack(alignment: .leading, spacing: 1) {
-                Text(card.title).font(.callout.weight(.semibold)).lineLimit(1)
+                Text(card.title).font(.body.weight(.semibold)).lineLimit(1)
                 HStack(spacing: 5) {
                     if card.explicit { ExplicitTag() }
-                    Text(card.artist).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                    Text(card.artist).font(.callout).foregroundStyle(.secondary).lineLimit(1)
                 }
             }
-            Spacer(minLength: 4)
+            Spacer(minLength: 8)
             SpotifyLink(card: card)
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 
