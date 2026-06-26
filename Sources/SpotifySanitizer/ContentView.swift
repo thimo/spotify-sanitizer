@@ -250,6 +250,14 @@ struct PlanView: View {
                         }
                     }
                 }
+                if !plan.albumDuplicates.isEmpty {
+                    section("Duplicate albums — \(plan.albumDuplicates.count) to resolve",
+                            ids: [], minWidth: 420, key: "dupalbums") {
+                        ForEach(plan.albumDuplicates) { dup in
+                            DuplicateAlbumView(dup: dup)
+                        }
+                    }
+                }
                 if !plan.completions.isEmpty {
                     section("Add — \(plan.additionsCount) to complete albums",
                             ids: plan.completions.flatMap { $0.missing.map(\.id) }, minWidth: 360, key: "add") {
@@ -311,8 +319,9 @@ struct PlanView: View {
 
     private var statsHeader: some View {
         let order = [("liked_tracks_scanned", "scanned"), ("duplicates_removed", "duplicates"),
-                     ("unplayable_removed", "unplayable"), ("unplayable_replaced", "replaced"),
-                     ("additions_suggested", "additions"), ("albums_kept", "albums")]
+                     ("duplicate_albums", "dup albums"), ("unplayable_removed", "unplayable"),
+                     ("unplayable_replaced", "replaced"), ("additions_suggested", "additions"),
+                     ("albums_kept", "albums")]
         return VStack(spacing: 6) {
             HStack(spacing: 18) {
                 ForEach(order, id: \.0) { key, label in
@@ -355,11 +364,13 @@ struct SectionHeader: View {
             }
             Text(title).font(.headline)
             Spacer()
-            let allOn = model.allIncluded(ids)
-            Button(allOn ? "Select none" : "Select all") {
-                model.setIncluded(ids, !allOn)
+            if !ids.isEmpty {
+                let allOn = model.allIncluded(ids)
+                Button(allOn ? "Select none" : "Select all") {
+                    model.setIncluded(ids, !allOn)
+                }
+                .font(.caption).textCase(nil).buttonStyle(.borderless)
             }
-            .font(.caption).textCase(nil).buttonStyle(.borderless)
         }
         .contentShape(Rectangle())
         .onTapGesture { collapsed?.wrappedValue.toggle() }
@@ -442,6 +453,52 @@ struct CardRow: View {
         .cell(accent)
         .contentShape(Rectangle())
         .onTapGesture { model.toggle(entryID) }
+    }
+}
+
+// One album held as multiple releases: pick the one to keep (default = most
+// complete); the other releases' liked tracks get unliked.
+struct DuplicateAlbumView: View {
+    @EnvironmentObject var model: AppModel
+    let dup: Plan.AlbumDuplicate
+
+    var body: some View {
+        let keep = model.keptReleaseID(dup)
+        VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("\(dup.artist) — \(dup.title)").font(.headline).lineLimit(1)
+                    Text("\(dup.releases.count) releases — keep one")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+                Spacer()
+                IgnoreButton { model.ignoreAlbumDuplicate(dup) }
+                DoButton(id: dup.id, label: "Keep chosen") { await model.doAlbumDuplicate(dup) }
+            }
+            ForEach(dup.releases) { release in
+                let isKeep = release.id == keep
+                HStack(spacing: 10) {
+                    Image(systemName: isKeep ? "largecircle.fill.circle" : "circle")
+                        .foregroundStyle(isKeep ? Color.accentColor : .secondary)
+                    Artwork(url: release.image)
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text(release.album).fontWeight(.medium).lineLimit(1)
+                        Text("\(release.likedCount) liked · \(release.totalTracks) tracks")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                    Spacer(minLength: 8)
+                    if isKeep {
+                        Text("keep").font(.caption.bold()).foregroundStyle(.green)
+                    } else {
+                        Text("unlike \(release.likedCount)").font(.caption).foregroundStyle(.red)
+                    }
+                }
+                .padding(.vertical, 1)
+                .contentShape(Rectangle())
+                .onTapGesture { model.keepRelease(dup, release) }
+            }
+        }
+        .cell(.purple)
     }
 }
 

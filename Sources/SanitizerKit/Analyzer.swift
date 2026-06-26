@@ -33,7 +33,12 @@ struct Analyzer {
         var kept = tracks
 
         if options.dropUnplayable { kept = try await dropUnplayable(kept, &plan) }
-        kept = dedupe(kept, &plan)
+        // Duplicate whole albums (standard vs deluxe) are chosen at the album
+        // level; pull their tracks out so they aren't also listed per-song.
+        let dupAlbumTrackIDs = detectDuplicateAlbums(kept, &plan)
+        let forDedup = dupAlbumTrackIDs.isEmpty ? kept
+            : kept.filter { !($0.id.map { dupAlbumTrackIDs.contains($0) } ?? false) }
+        kept = dedupe(forDedup, &plan)
         if options.completeAlbums, library != nil { try await completeAlbums(kept, &plan) }
 
         plan.stats = [
@@ -41,6 +46,7 @@ struct Analyzer {
             "duplicates_removed":   plan.removals.filter { $0.reason.hasPrefix("duplicate") }.count,
             "unplayable_removed":   plan.removals.filter { $0.reason.hasPrefix("unplayable") }.count,
             "unplayable_replaced":  plan.replacements.count,
+            "duplicate_albums":     plan.albumDuplicates.count,
             "additions_suggested":  plan.additionsCount,
             "albums_kept":          Set(kept.compactMap { $0.albumID }).count
         ]
@@ -121,6 +127,29 @@ struct Analyzer {
             }
         }
         return clusters
+    }
+
+    // Find albums you hold as 2+ releases (e.g. standard + deluxe). A release
+    // qualifies with ≥2 liked tracks; a set needs ≥2 such releases. Returns the
+    // track ids involved (so they're excluded from per-song dedup).
+    private func detectDuplicateAlbums(_ tracks: [Track], _ plan: inout Plan) -> Set<String> {
+        var involved = Set<String>()
+        for (_, group) in Dictionary(grouping: tracks.filter { $0.albumID != nil }, by: { $0.albumKey }) {
+            let byRelease = Dictionary(grouping: group, by: { $0.albumID! }).filter { $0.value.count >= 2 }
+            guard byRelease.count >= 2 else { continue }
+
+            var releases = byRelease.map { albumID, ts in
+                Plan.AlbumRelease(albumID: albumID, album: ts[0].albumName, artist: ts[0].primaryArtist,
+                                  image: ts[0].imageURL, likedCount: ts.count,
+                                  totalTracks: ts[0].albumTotalTracks, trackIDs: ts.compactMap { $0.id })
+            }
+            // Keeper first: most complete (most tracks), then most liked.
+            releases.sort { ($0.totalTracks, $0.likedCount) > ($1.totalTracks, $1.likedCount) }
+            plan.albumDuplicates.append(Plan.AlbumDuplicate(title: releases[0].album,
+                                                            artist: releases[0].artist, releases: releases))
+            releases.forEach { involved.formUnion($0.trackIDs) }
+        }
+        return involved
     }
 
     private func albumAffinity(_ t: Track, _ albumLikes: [String: Int]) -> Int {

@@ -90,7 +90,18 @@ struct Track {
 
     private static let skitPattern = regex(#"\b(skit|interlude|intro|outro|prelude|reprise|segue)\b"#)
     private static let versionCruft = regex(#"\s*[-(\[].*?(remaster|remastered|mono|stereo|deluxe|edit|version|anniversary|mix|live|radio).*?[)\]]?$"#)
+    private static let albumCruft = regex(#"\s*[-(\[].*?(deluxe|expanded|extended|remaster|remastered|anniversary|edition|version|mono|stereo|bonus|reissue|special).*?[)\]]?$"#)
     private static let nonAlnum = regex(#"[^a-z0-9]+"#)
+
+    // Normalized album identity (artist + album name, edition suffix stripped)
+    // so "X" and "X (Deluxe Edition)" map together for duplicate-album detection.
+    var albumKey: String {
+        var a = albumName.lowercased().replacingFirst(Track.albumCruft, with: "")
+        a = a.replacingAll(Track.nonAlnum, with: " ").trimmingCharacters(in: .whitespaces)
+        let artist = primaryArtist.lowercased()
+            .replacingAll(Track.nonAlnum, with: " ").trimmingCharacters(in: .whitespaces)
+        return "\(artist)|\(a)"
+    }
 
     func isSkit(maxSeconds: Int = 60) -> Bool {
         durationMs <= maxSeconds * 1000 || name.matches(Track.skitPattern)

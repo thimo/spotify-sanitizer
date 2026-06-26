@@ -21,6 +21,7 @@ final class AppModel: ObservableObject {
 
     @Published var clientIDInput = ""
     @Published var excluded: Set<UUID> = []   // entries the user unticked
+    @Published var keptRelease: [UUID: UUID] = [:]   // albumDuplicate.id -> chosen release.id
     @Published var workingItem: UUID?         // a single item being applied right now
     @Published var lastLog: URL?
     @Published var scannedAt: Date?           // when the shown plan was built
@@ -82,7 +83,21 @@ final class AppModel: ObservableObject {
         for completion in plan.completions {
             for track in completion.missing where included(track.id) { add.append(track.card.id) }
         }
+        for dup in plan.albumDuplicates {
+            let keep = keptReleaseID(dup)
+            for release in dup.releases where release.id != keep { remove.append(contentsOf: release.trackIDs) }
+        }
         return (remove, add)
+    }
+
+    // MARK: duplicate-album release choice
+
+    func keptReleaseID(_ dup: Plan.AlbumDuplicate) -> UUID {
+        keptRelease[dup.id] ?? dup.releases.first?.id ?? dup.id
+    }
+
+    func keepRelease(_ dup: Plan.AlbumDuplicate, _ release: Plan.AlbumRelease) {
+        keptRelease[dup.id] = release.id
     }
 
     var selectedCounts: (unlike: Int, like: Int) {
@@ -199,6 +214,22 @@ final class AppModel: ObservableObject {
         Engine.ignore([rep.dead.id])
         plan?.replacements.removeAll { $0.id == rep.id }
         afterIgnore("Ignored “\(rep.dead.title)” — won't suggest again.")
+    }
+
+    // Keep the chosen release; unlike the other releases' liked tracks.
+    func doAlbumDuplicate(_ dup: Plan.AlbumDuplicate) async {
+        let keep = keptReleaseID(dup)
+        let ids = dup.releases.filter { $0.id != keep }.flatMap { $0.trackIDs }
+        guard !ids.isEmpty else { return }
+        await perform(dup.id, remove: ids, add: [], done: "Kept one release of “\(dup.title)”") {
+            self.plan?.albumDuplicates.removeAll { $0.id == dup.id }
+        }
+    }
+
+    func ignoreAlbumDuplicate(_ dup: Plan.AlbumDuplicate) {
+        Engine.ignore(dup.releases.flatMap { $0.trackIDs })
+        plan?.albumDuplicates.removeAll { $0.id == dup.id }
+        afterIgnore("Ignored “\(dup.title)” — won't suggest again.")
     }
 
     func ignoreCompletion(_ c: Plan.AlbumCompletion) {

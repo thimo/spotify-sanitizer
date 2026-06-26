@@ -186,8 +186,20 @@ public extension Engine {
                 entry(7, "dk7", "Life of an Outlaw", 268, liked: true)
             ])
         ]
+        func release(_ albumID: String, _ album: String, liked: Int, total: Int) -> Plan.AlbumRelease {
+            Plan.AlbumRelease(albumID: albumID, album: album, artist: "Kendrick Lamar",
+                              image: "https://picsum.photos/seed/\(albumID)/100",
+                              likedCount: liked, totalTracks: total,
+                              trackIDs: (0..<liked).map { "\(albumID)-\($0)" })
+        }
+        plan.albumDuplicates = [
+            Plan.AlbumDuplicate(title: "good kid, m.A.A.d city", artist: "Kendrick Lamar", releases: [
+                release("gkmcDeluxe", "good kid, m.A.A.d city (Deluxe)", liked: 8, total: 18),
+                release("gkmcStd", "good kid, m.A.A.d city", liked: 5, total: 13)
+            ])
+        ]
         plan.stats = [
-            "liked_tracks_scanned": 3331, "duplicates_removed": 166, "unplayable_removed": 52,
+            "liked_tracks_scanned": 3331, "duplicates_removed": 166, "duplicate_albums": 1, "unplayable_removed": 52,
             "unplayable_replaced": 2, "additions_suggested": 145, "albums_kept": 1139
         ]
         return plan

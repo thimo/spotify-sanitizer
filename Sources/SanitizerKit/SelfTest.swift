@@ -106,6 +106,18 @@ public extension Engine {
         check(rt.uri == "spotify:track:SAVED", "relink: uri should be the saved id")
         check(rt.card.url == "https://open.spotify.com/track/SAVED", "relink: link should target the saved id")
 
+        // duplicate-album detection: standard + deluxe → one set, keeper is the
+        // most complete, and its songs aren't also listed per-track
+        plan = await buildPlan([
+            saved(name: "One", album: "Greatest", total: 20, id: "g1"),
+            saved(name: "Two", album: "Greatest", total: 20, id: "g2"),
+            saved(name: "One", album: "Greatest (Deluxe)", total: 30, id: "d1"),
+            saved(name: "Two", album: "Greatest (Deluxe)", total: 30, id: "d2")
+        ])
+        check(plan.albumDuplicates.count == 1, "dup-album: should detect one set, got \(plan.albumDuplicates.count)")
+        check(plan.albumDuplicates.first?.releases.first?.totalTracks == 30, "dup-album: keeper should be the deluxe (most complete)")
+        check(plan.removals.isEmpty, "dup-album: songs handled at album level, not per-track")
+
         // skit detection
         check(Track(saved(name: "Interlude")).isSkit(), "skit: title not detected")
         check(Track(saved(name: "Short bit", durationMs: 30_000)).isSkit(), "skit: short not detected")

@@ -64,15 +64,40 @@ public struct Plan: Codable {
         public var missing: [AlbumTrack] { tracks.filter { !$0.liked } }
     }
 
+    // One release of an album you have multiple copies of.
+    public struct AlbumRelease: Codable, Identifiable {
+        public let id = UUID()
+        public var albumID: String
+        public var album: String       // display name, with its edition suffix
+        public var artist: String
+        public var image: String?
+        public var likedCount: Int     // tracks of this release you like
+        public var totalTracks: Int    // album size — bigger = more complete (deluxe)
+        public var trackIDs: [String]  // your liked track ids on this release
+        private enum CodingKeys: String, CodingKey { case albumID, album, artist, image, likedCount, totalTracks, trackIDs }
+    }
+    // The same album held as 2+ releases (e.g. standard + deluxe). Releases are
+    // ordered with the suggested keeper (most complete) first.
+    public struct AlbumDuplicate: Codable, Identifiable {
+        public let id = UUID()
+        public var title: String
+        public var artist: String
+        public var releases: [AlbumRelease]
+        private enum CodingKeys: String, CodingKey { case title, artist, releases }
+    }
+
     public var removals: [Removal] = []
     public var replacements: [Replacement] = []
+    public var albumDuplicates: [AlbumDuplicate] = []
     public var completions: [AlbumCompletion] = []
     public var stats: [String: Int] = [:]
 
     public init() {}
 
     public var additionsCount: Int { completions.reduce(0) { $0 + $1.missing.count } }
-    public var isEmpty: Bool { removals.isEmpty && replacements.isEmpty && completions.isEmpty }
+    public var isEmpty: Bool {
+        removals.isEmpty && replacements.isEmpty && albumDuplicates.isEmpty && completions.isEmpty
+    }
 
     mutating func remove(_ track: Track, reason: String, keeper: Track? = nil) {
         removals.append(Removal(card: track.card, reason: reason, keeper: keeper?.card))
