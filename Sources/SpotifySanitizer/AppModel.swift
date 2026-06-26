@@ -11,7 +11,14 @@ final class AppModel: ObservableObject {
     @Published var error: String?
     @Published var notice: String?
     @Published var rateLimitedUntil: Date?   // when Spotify says we may retry
-    @Published var findAlternatives = false
+    // Scan options (persisted in UserDefaults).
+    @Published var completionThreshold = 0.70 { didSet { ud.set(completionThreshold, forKey: "completionThreshold") } }
+    @Published var skitMaxSeconds = 90 { didSet { ud.set(skitMaxSeconds, forKey: "skitMaxSeconds") } }
+    @Published var completeAlbums = true { didSet { ud.set(completeAlbums, forKey: "completeAlbums") } }
+    @Published var dropUnplayable = true { didSet { ud.set(dropUnplayable, forKey: "dropUnplayable") } }
+    @Published var findAlternatives = false { didSet { ud.set(findAlternatives, forKey: "findAlternatives") } }
+    @Published var fuzzyAlternatives = false { didSet { ud.set(fuzzyAlternatives, forKey: "fuzzyAlternatives") } }
+
     @Published var clientIDInput = ""
     @Published var excluded: Set<UUID> = []   // entries the user unticked
     @Published var workingItem: UUID?         // a single item being applied right now
@@ -19,8 +26,10 @@ final class AppModel: ObservableObject {
     @Published var scannedAt: Date?           // when the shown plan was built
 
     private let demo = CommandLine.arguments.contains("--demo")
+    private let ud = UserDefaults.standard
 
     init() {
+        loadSettings()
         lastLog = Engine.latestLog
         // --demo: load a fixture plan (no network) for UI work across restarts.
         if demo {
@@ -82,6 +91,15 @@ final class AppModel: ObservableObject {
 
     // MARK: actions
 
+    private func loadSettings() {
+        if ud.object(forKey: "completionThreshold") != nil { completionThreshold = ud.double(forKey: "completionThreshold") }
+        if ud.object(forKey: "skitMaxSeconds") != nil { skitMaxSeconds = ud.integer(forKey: "skitMaxSeconds") }
+        if ud.object(forKey: "completeAlbums") != nil { completeAlbums = ud.bool(forKey: "completeAlbums") }
+        if ud.object(forKey: "dropUnplayable") != nil { dropUnplayable = ud.bool(forKey: "dropUnplayable") }
+        if ud.object(forKey: "findAlternatives") != nil { findAlternatives = ud.bool(forKey: "findAlternatives") }
+        if ud.object(forKey: "fuzzyAlternatives") != nil { fuzzyAlternatives = ud.bool(forKey: "fuzzyAlternatives") }
+    }
+
     func saveClientID() {
         let id = clientIDInput.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !id.isEmpty else { return }
@@ -105,7 +123,14 @@ final class AppModel: ObservableObject {
             return
         }
         await run("Scanning your library…") {
-            let plan = try await Engine.scan(findAlternatives: self.findAlternatives) { p in
+            let plan = try await Engine.scan(
+                completionThreshold: self.completionThreshold,
+                skitMaxSeconds: self.skitMaxSeconds,
+                dropUnplayable: self.dropUnplayable,
+                findAlternatives: self.findAlternatives,
+                fuzzyAlternatives: self.fuzzyAlternatives,
+                completeAlbums: self.completeAlbums
+            ) { p in
                 Task { @MainActor in self.progress = p }
             }
             self.plan = plan

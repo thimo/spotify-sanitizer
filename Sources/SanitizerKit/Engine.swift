@@ -140,7 +140,10 @@ public extension Engine {
         plan.replacements = [
             .init(dead: card("dead2", "Santa Esmeralda", "Don't Let Me Be Misunderstood", "Kill Bill OST (PA)", 628),
                   alternative: card("alt2", "Santa Esmeralda", "Don't Let Me Be Misunderstood", "House Of The Rising Sun", 628),
-                  reason: "unplayable in your market — same recording (ISRC) plays here", fuzzy: false)
+                  reason: "unplayable in your market — same recording (ISRC) plays here", fuzzy: false),
+            .init(dead: card("dead3", "2Pac", "Who Do You Believe In", "Greatest Hits (Clean)", 277),
+                  alternative: card("alt3", "2Pac", "Who Do You Believe In", "Better Dayz", 281),
+                  reason: "unplayable — likely the same song (verify)", fuzzy: true)
         ]
         func entry(_ num: Int, _ id: String, _ title: String, _ secs: Int, liked: Bool, play: String = "4cOdK2wGLETKBW3PvgPWqT") -> Plan.AlbumTrack {
             Plan.AlbumTrack(card: card(id, "Makaveli", title, "The Don Killuminati", secs, explicit: true, num: num, play: play), liked: liked)
@@ -158,7 +161,7 @@ public extension Engine {
         ]
         plan.stats = [
             "liked_tracks_scanned": 3331, "duplicates_removed": 166, "unplayable_removed": 52,
-            "unplayable_replaced": 1, "additions_suggested": 145, "albums_kept": 1139
+            "unplayable_replaced": 2, "additions_suggested": 145, "albums_kept": 1139
         ]
         return plan
     }

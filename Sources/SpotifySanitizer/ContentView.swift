@@ -5,6 +5,7 @@ import SanitizerKit
 struct ContentView: View {
     @EnvironmentObject var model: AppModel
     @State private var confirmApply = false
+    @State private var showSettings = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -26,9 +27,11 @@ struct ContentView: View {
             Spacer()
 
             if model.loggedIn {
-                Toggle("Find alternatives", isOn: $model.findAlternatives)
-                    .toggleStyle(.checkbox)
-                    .help("For unplayable tracks, find the same recording (ISRC) on a playable release")
+                Button { showSettings.toggle() } label: { Image(systemName: "slider.horizontal.3") }
+                    .help("Scan options")
+                    .popover(isPresented: $showSettings, arrowEdge: .bottom) {
+                        SettingsView().environmentObject(model)
+                    }
                 Button {
                     Task { await model.scan() }
                 } label: { Label("Scan", systemImage: "arrow.clockwise") }
@@ -135,6 +138,41 @@ struct ContentView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .padding()
+    }
+}
+
+// Scan-option tuning, in a popover. Changes apply to the next scan.
+struct SettingsView: View {
+    @EnvironmentObject var model: AppModel
+
+    var body: some View {
+        Form {
+            Section("Album completion") {
+                Toggle("Suggest completing albums", isOn: $model.completeAlbums)
+                if model.completeAlbums {
+                    HStack {
+                        Text("Threshold")
+                        Slider(value: $model.completionThreshold, in: 0.5...1.0, step: 0.05)
+                        Text("\(Int((model.completionThreshold * 100).rounded()))%")
+                            .monospacedDigit().frame(width: 40, alignment: .trailing)
+                    }
+                    Stepper("Skits ≤ \(model.skitMaxSeconds)s", value: $model.skitMaxSeconds, in: 30...150, step: 5)
+                }
+            }
+            Section("Unplayable tracks") {
+                Toggle("Remove unplayable", isOn: $model.dropUnplayable)
+                Toggle("Find alternatives (ISRC)", isOn: $model.findAlternatives)
+                    .help("For unplayable tracks, find the same recording (ISRC) on a playable release")
+                if model.findAlternatives {
+                    Toggle("Also fuzzy match — verify", isOn: $model.fuzzyAlternatives)
+                        .help("If no exact ISRC match, try a title/artist match. May be a different version.")
+                }
+            }
+            Text("Changes apply on the next Scan.")
+                .font(.caption).foregroundStyle(.secondary)
+        }
+        .padding(20)
+        .frame(width: 360)
     }
 }
 
@@ -395,7 +433,15 @@ struct ReplacementRow: View {
             VStack(alignment: .leading, spacing: 6) {
                 line(replacement.dead, symbol: "xmark.circle.fill", color: .red)
                 line(replacement.alternative, symbol: "checkmark.circle.fill", color: .green)
-                Text(replacement.reason).font(.caption2).foregroundStyle(.tertiary).lineLimit(1)
+                HStack(spacing: 6) {
+                    if replacement.fuzzy {
+                        Text("VERIFY").font(.caption2.bold())
+                            .padding(.horizontal, 5).padding(.vertical, 1)
+                            .background(Color.orange.opacity(0.25), in: Capsule())
+                            .foregroundStyle(.orange)
+                    }
+                    Text(replacement.reason).font(.caption2).foregroundStyle(.tertiary).lineLimit(1)
+                }
             }
             Spacer(minLength: 8)
             DoButton(id: entryID, label: "Replace") { await model.doReplacement(replacement) }
