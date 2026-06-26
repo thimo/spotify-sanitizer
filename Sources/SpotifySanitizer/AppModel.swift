@@ -117,6 +117,12 @@ final class AppModel: ObservableObject {
         }
     }
 
+    func logout() {
+        Engine.logout()
+        loggedIn = false
+        notice = "Logged out."
+    }
+
     func scan() async {
         if let until = Engine.rateLimitedUntil {
             rateLimitedUntil = until   // still cooling down — don't fire a doomed request

@@ -172,6 +172,23 @@ struct SettingsView: View {
             } header: {
                 Text("Unplayable tracks").font(.headline)
             }
+            Section {
+                HStack {
+                    Image(systemName: model.loggedIn ? "checkmark.circle.fill" : "xmark.circle")
+                        .foregroundStyle(model.loggedIn ? .green : .secondary)
+                    Text(model.loggedIn ? "Logged in" : "Not logged in")
+                    Spacer()
+                    Button("Log in again") { Task { await model.login() } }
+                    if model.loggedIn {
+                        Button("Log out") { model.logout() }
+                    }
+                }
+                Text("Re-authorize if Spotify refuses changes or you changed permissions.")
+                    .font(.caption).foregroundStyle(.secondary)
+            } header: {
+                Text("Account").font(.headline)
+            }
+
             Text("Changes apply on the next Scan.")
                 .font(.caption).foregroundStyle(.secondary)
         }
