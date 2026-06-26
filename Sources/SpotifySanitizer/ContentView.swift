@@ -245,7 +245,7 @@ struct PlanView: View {
                 if !plan.replacements.isEmpty {
                     section("Replace — \(plan.replacements.count) unplayable",
                             ids: plan.replacements.map(\.id), minWidth: 360, key: "replace") {
-                        ForEach(plan.replacements) { rep in
+                        ForEach(plan.replacements.sorted { sortKey($0.dead) < sortKey($1.dead) }) { rep in
                             ReplacementRow(entryID: rep.id, replacement: rep)
                         }
                     }
@@ -253,7 +253,7 @@ struct PlanView: View {
                 if !plan.completions.isEmpty {
                     section("Add — \(plan.additionsCount) to complete albums",
                             ids: plan.completions.flatMap { $0.missing.map(\.id) }, minWidth: 360, key: "add") {
-                        ForEach(plan.completions) { completion in
+                        ForEach(plan.completions.sorted { completionKey($0) < completionKey($1) }) { completion in
                             AlbumCompletionView(completion: completion)
                         }
                     }
@@ -281,11 +281,20 @@ struct PlanView: View {
         [GridItem(.adaptive(minimum: minWidth), spacing: 10, alignment: .top)]
     }
 
-    // Removals grouped by their reason, biggest group first.
+    // Removals grouped by their reason, biggest group first; items by artist→album→title.
     private var removalGroups: [(reason: String, items: [Plan.Removal])] {
         Dictionary(grouping: plan.removals, by: { $0.reason })
-            .map { (reason: $0.key, items: $0.value) }
+            .map { (reason: $0.key, items: $0.value.sorted { sortKey($0.card) < sortKey($1.card) }) }
             .sorted { $0.items.count > $1.items.count }
+    }
+
+    // Case-insensitive artist → album → title ordering key.
+    private func sortKey(_ c: Card) -> String {
+        "\(c.artist.lowercased())\u{1}\(c.album.lowercased())\u{1}\(c.title.lowercased())"
+    }
+
+    private func completionKey(_ c: Plan.AlbumCompletion) -> String {
+        "\((c.tracks.first?.card.artist ?? "").lowercased())\u{1}\(c.album.lowercased())"
     }
 
     // Lighter header for a sub-group, with its own select-all/none.
