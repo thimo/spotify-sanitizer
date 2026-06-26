@@ -43,6 +43,10 @@ final class AppModel: ObservableObject {
 
     func included(_ id: UUID) -> Bool { !excluded.contains(id) }
 
+    func toggle(_ id: UUID) {
+        if excluded.contains(id) { excluded.remove(id) } else { excluded.insert(id) }
+    }
+
     func allIncluded(_ ids: [UUID]) -> Bool { ids.allSatisfy { !excluded.contains($0) } }
 
     func setIncluded(_ ids: [UUID], _ include: Bool) {

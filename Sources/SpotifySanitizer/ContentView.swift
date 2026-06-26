@@ -257,6 +257,16 @@ extension View {
     func cell(_ color: Color) -> some View { modifier(CellBackground(color: color)) }
 }
 
+// Non-interactive checkbox indicator — the whole row is the tap target.
+struct CheckBox: View {
+    let on: Bool
+    var body: some View {
+        Image(systemName: on ? "checkmark.square.fill" : "square")
+            .font(.title3)
+            .foregroundStyle(on ? Color.accentColor : Color.secondary)
+    }
+}
+
 struct Artwork: View {
     let url: String?
     var body: some View {
@@ -281,7 +291,7 @@ struct CardRow: View {
 
     var body: some View {
         HStack(spacing: 10) {
-            Toggle("", isOn: model.binding(entryID)).labelsHidden()
+            CheckBox(on: model.included(entryID))
             Artwork(url: card.image)
             VStack(alignment: .leading, spacing: 1) {
                 Text(card.title).font(.body.weight(.semibold)).lineLimit(1)
@@ -300,6 +310,8 @@ struct CardRow: View {
         }
         .opacity(model.included(entryID) ? 1 : 0.4)
         .cell(accent)
+        .contentShape(Rectangle())
+        .onTapGesture { model.toggle(entryID) }
     }
 }
 
@@ -347,7 +359,7 @@ struct AlbumTrackRow: View {
                 Image(systemName: "checkmark.circle.fill").foregroundStyle(.green.opacity(0.5))
                     .help("Already in your library")
             } else {
-                Toggle("", isOn: model.binding(track.id)).labelsHidden()
+                CheckBox(on: model.included(track.id))
             }
             Text(track.card.trackNumber.map(String.init) ?? "")
                 .font(.callout.monospacedDigit()).foregroundStyle(.secondary)
@@ -367,6 +379,8 @@ struct AlbumTrackRow: View {
         }
         .padding(.vertical, 1)
         .opacity(track.liked ? 1 : (model.included(track.id) ? 1 : 0.45))
+        .contentShape(Rectangle())
+        .onTapGesture { if !track.liked { model.toggle(track.id) } }
     }
 }
 
@@ -377,7 +391,7 @@ struct ReplacementRow: View {
 
     var body: some View {
         HStack(alignment: .top, spacing: 10) {
-            Toggle("", isOn: model.binding(entryID)).labelsHidden()
+            CheckBox(on: model.included(entryID))
             VStack(alignment: .leading, spacing: 6) {
                 line(replacement.dead, symbol: "xmark.circle.fill", color: .red)
                 line(replacement.alternative, symbol: "checkmark.circle.fill", color: .green)
@@ -388,6 +402,8 @@ struct ReplacementRow: View {
         }
         .opacity(model.included(entryID) ? 1 : 0.4)
         .cell(.orange)
+        .contentShape(Rectangle())
+        .onTapGesture { model.toggle(entryID) }
     }
 
     private func line(_ card: Card, symbol: String, color: Color) -> some View {
