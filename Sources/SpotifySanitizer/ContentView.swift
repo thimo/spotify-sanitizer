@@ -147,7 +147,7 @@ struct SettingsView: View {
 
     var body: some View {
         Form {
-            Section("Album completion") {
+            Section {
                 Toggle("Suggest completing albums", isOn: $model.completeAlbums)
                 if model.completeAlbums {
                     HStack {
@@ -158,8 +158,10 @@ struct SettingsView: View {
                     }
                     Stepper("Skits ≤ \(model.skitMaxSeconds)s", value: $model.skitMaxSeconds, in: 30...150, step: 5)
                 }
+            } header: {
+                Text("Album completion").font(.headline)
             }
-            Section("Unplayable tracks") {
+            Section {
                 Toggle("Remove unplayable", isOn: $model.dropUnplayable)
                 Toggle("Find alternatives (ISRC)", isOn: $model.findAlternatives)
                     .help("For unplayable tracks, find the same recording (ISRC) on a playable release")
@@ -167,6 +169,8 @@ struct SettingsView: View {
                     Toggle("Also fuzzy match — verify", isOn: $model.fuzzyAlternatives)
                         .help("If no exact ISRC match, try a title/artist match. May be a different version.")
                 }
+            } header: {
+                Text("Unplayable tracks").font(.headline)
             }
             Text("Changes apply on the next Scan.")
                 .font(.caption).foregroundStyle(.secondary)
