@@ -24,7 +24,23 @@ if args.contains("--selftest") {
     }
 }
 
-guard Engine.loggedIn() else { fail("Not logged in. Run the Ruby CLI `login` first.") }
+guard Engine.loggedIn() else { fail("Not logged in.") }
+
+if args.contains("--ping") {
+    do {
+        try await Engine.ping()
+        print("OK — API reachable, not rate limited.")
+        exit(0)
+    } catch let api as ApiError {
+        if case .rateLimited(let s) = api {
+            print("Still rate limited — about \(s / 3600)h \((s % 3600) / 60)m to go (\(s)s).")
+            exit(2)
+        }
+        fail(api.errorDescription ?? "\(api)")
+    } catch {
+        fail(error.localizedDescription)
+    }
+}
 
 do {
     let started = Date()

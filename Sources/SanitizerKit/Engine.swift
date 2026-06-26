@@ -13,6 +13,12 @@ public enum Engine {
 
     public static func login() async throws { try await Auth.login() }
 
+    // One lightweight authenticated request (refreshes the token as a side
+    // effect). Throws ApiError.rateLimited with the remaining seconds if banned.
+    public static func ping() async throws {
+        _ = try await Client().get("/me")
+    }
+
     // Fetch the library and build a reviewable plan. Read-only.
     public static func scan(
         market: String? = nil,
