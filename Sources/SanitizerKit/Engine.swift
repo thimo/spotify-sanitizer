@@ -104,23 +104,25 @@ public extension Engine {
     // A fixture plan for UI work — no network, no auth, no rate limit. Artwork
     // uses Lorem Picsum (stable per seed) so layout/thumbnails are realistic.
     static func samplePlan() -> Plan {
+        // `play` is a real Spotify track id so the open-arrow actually navigates
+        // in the demo (the display ids are placeholders). Defaults to a Rickroll.
         func card(_ id: String, _ artist: String, _ title: String, _ album: String,
-                  _ secs: Int, explicit: Bool = false) -> Card {
+                  _ secs: Int, explicit: Bool = false, play: String = "4cOdK2wGLETKBW3PvgPWqT") -> Card {
             Card(id: id, artist: artist, title: title, album: album, explicit: explicit,
                  durationMs: secs * 1000,
                  image: "https://picsum.photos/seed/\(id)/100",
-                 url: "https://open.spotify.com/track/\(id)",
-                 uri: "spotify:track:\(id)")
+                 url: "https://open.spotify.com/track/\(play)",
+                 uri: "spotify:track:\(play)")
         }
 
         var plan = Plan()
         plan.removals = [
-            .init(card: card("dup1", "Daft Punk", "Get Lucky", "Random Access Memories", 248),
+            .init(card: card("dup1", "Daft Punk", "Get Lucky", "Random Access Memories", 248, play: "69kOkLUCkxIZYexIgSG8rq"),
                   reason: "duplicate — keeping one copy",
-                  keeper: card("dup1k", "Daft Punk", "Get Lucky", "Random Access Memories", 369)),
-            .init(card: card("cln1", "Kendrick Lamar", "DNA.", "DAMN.", 185),
+                  keeper: card("dup1k", "Daft Punk", "Get Lucky", "Random Access Memories", 369, play: "69kOkLUCkxIZYexIgSG8rq")),
+            .init(card: card("cln1", "Kendrick Lamar", "DNA.", "DAMN.", 185, play: "6HZILIRieu8S0iqY8kIKhj"),
                   reason: "duplicate — clean version, keeping explicit",
-                  keeper: card("exp1", "Kendrick Lamar", "DNA.", "DAMN.", 185, explicit: true)),
+                  keeper: card("exp1", "Kendrick Lamar", "DNA.", "DAMN.", 185, explicit: true, play: "6HZILIRieu8S0iqY8kIKhj")),
             .init(card: card("dead1", "De La Soul", "Saturdays", "Swing", 197),
                   reason: "unplayable in your market", keeper: nil)
         ]
