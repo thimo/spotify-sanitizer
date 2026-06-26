@@ -115,6 +115,7 @@ struct Track {
              explicit: explicit,
              durationMs: durationMs,
              trackNumber: trackNumber,
+             addedAt: addedAt,
              image: imageURL,
              url: spotifyURL,
              uri: uri ?? id.map { "spotify:track:\($0)" })

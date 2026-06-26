@@ -113,7 +113,7 @@ struct Analyzer {
         if loserRank > keeperRank {
             return "duplicate — \(loser.albumType ?? "?") version, keeping \(keeper.albumType ?? "?")"
         }
-        return "duplicate — keeping one copy"
+        return "duplicate — keeping the one you added first"
     }
 
     // For albums you've mostly liked (ignoring skits), suggest the missing songs.

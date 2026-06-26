@@ -542,11 +542,21 @@ struct DuplicateRow: View {
                     Text(card.album.isEmpty ? card.artist : "\(card.artist) · \(card.album)")
                         .font(.callout).foregroundStyle(.secondary).lineLimit(1)
                 }
+                if let added = shortDate(card.addedAt) {
+                    Text("added \(added)").font(.caption2).foregroundStyle(.tertiary)
+                }
             }
             Spacer(minLength: 8)
             Text(card.durationFormatted).font(.callout.monospacedDigit()).foregroundStyle(.secondary)
             SpotifyLink(card: card)
         }
+    }
+
+    // The ISO added_at as a plain YYYY-MM-DD (the differentiator for otherwise
+    // identical copies — we keep the earliest).
+    private func shortDate(_ iso: String?) -> String? {
+        guard let iso, iso.count >= 10 else { return nil }
+        return String(iso.prefix(10))
     }
 }
 

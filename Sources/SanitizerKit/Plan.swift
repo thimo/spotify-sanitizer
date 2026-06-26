@@ -9,6 +9,7 @@ public struct Card: Codable, Hashable {
     public var explicit: Bool
     public var durationMs: Int
     public var trackNumber: Int?
+    public var addedAt: String?
     public var image: String?
     public var url: String?        // open.spotify.com web link (fallback)
     public var uri: String?        // spotify:track:… — opens the desktop app

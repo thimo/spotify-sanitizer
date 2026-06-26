@@ -141,10 +141,10 @@ public extension Engine {
         // `play` is a real Spotify track id so the open-arrow actually navigates
         // in the demo (the display ids are placeholders). Defaults to a Rickroll.
         func card(_ id: String, _ artist: String, _ title: String, _ album: String,
-                  _ secs: Int, explicit: Bool = false, num: Int? = nil,
+                  _ secs: Int, explicit: Bool = false, num: Int? = nil, added: String? = nil,
                   play: String = "4cOdK2wGLETKBW3PvgPWqT") -> Card {
             Card(id: id, artist: artist, title: title, album: album, explicit: explicit,
-                 durationMs: secs * 1000, trackNumber: num,
+                 durationMs: secs * 1000, trackNumber: num, addedAt: added,
                  image: "https://picsum.photos/seed/\(id)/100",
                  url: "https://open.spotify.com/track/\(play)",
                  uri: "spotify:track:\(play)")
@@ -158,6 +158,9 @@ public extension Engine {
             .init(card: card("cln1", "Kendrick Lamar", "DNA.", "DAMN. (Clean)", 185, play: "6HZILIRieu8S0iqY8kIKhj"),
                   reason: "duplicate — clean version, keeping explicit",
                   keeper: card("exp1", "Kendrick Lamar", "DNA.", "DAMN.", 185, explicit: true, play: "6HZILIRieu8S0iqY8kIKhj")),
+            .init(card: card("tie1", "Outkast", "Ms. Jackson", "Stankonia", 270, explicit: true, added: "2021-08-14T00:00:00Z"),
+                  reason: "duplicate — keeping the one you added first",
+                  keeper: card("tie1k", "Outkast", "Ms. Jackson", "Stankonia", 270, explicit: true, added: "2017-02-03T00:00:00Z")),
             .init(card: card("dead1", "De La Soul", "Saturdays", "Swing", 197),
                   reason: "unplayable in your market", keeper: nil)
         ]
