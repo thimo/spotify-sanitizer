@@ -26,12 +26,6 @@ public struct Plan: Codable {
         public var keeper: Card?
         private enum CodingKeys: String, CodingKey { case card, reason, keeper }
     }
-    public struct Addition: Codable, Identifiable {
-        public let id = UUID()
-        public var card: Card
-        public var reason: String
-        private enum CodingKeys: String, CodingKey { case card, reason }
-    }
     public struct Replacement: Codable, Identifiable {
         public let id = UUID()
         public var dead: Card
@@ -39,23 +33,51 @@ public struct Plan: Codable {
         public var reason: String
         private enum CodingKeys: String, CodingKey { case dead, alternative, reason }
     }
+    // One track in an album's full tracklist; `liked` means it's already in your
+    // library (context), otherwise it's a proposed addition (tickable).
+    public struct AlbumTrack: Codable, Identifiable {
+        public let id = UUID()
+        public var card: Card
+        public var liked: Bool
+        private enum CodingKeys: String, CodingKey { case card, liked }
+    }
+    // A partially-liked album: its full (non-skit) tracklist, in order.
+    public struct AlbumCompletion: Codable, Identifiable {
+        public let id = UUID()
+        public var album: String
+        public var likedCount: Int
+        public var total: Int
+        public var tracks: [AlbumTrack]
+        private enum CodingKeys: String, CodingKey { case album, likedCount, total, tracks }
+
+        public var missing: [AlbumTrack] { tracks.filter { !$0.liked } }
+    }
 
     public var removals: [Removal] = []
-    public var additions: [Addition] = []
     public var replacements: [Replacement] = []
+    public var completions: [AlbumCompletion] = []
     public var stats: [String: Int] = [:]
 
     public init() {}
 
-    public var isEmpty: Bool { removals.isEmpty && additions.isEmpty && replacements.isEmpty }
+    public var additionsCount: Int { completions.reduce(0) { $0 + $1.missing.count } }
+    public var isEmpty: Bool { removals.isEmpty && replacements.isEmpty && completions.isEmpty }
 
     mutating func remove(_ track: Track, reason: String, keeper: Track? = nil) {
         removals.append(Removal(card: track.card, reason: reason, keeper: keeper?.card))
     }
-    mutating func add(_ track: Track, reason: String) {
-        additions.append(Addition(card: track.card, reason: reason))
-    }
     mutating func replace(_ dead: Track, with alternative: Track, reason: String) {
         replacements.append(Replacement(dead: dead.card, alternative: alternative.card, reason: reason))
+    }
+    // `tracks` is the full non-skit album tracklist in order; `likedIDs` flags
+    // which are already in the library.
+    mutating func addCompletion(album: String, tracks: [Track], likedIDs: Set<String>) {
+        let entries = tracks.map { track in
+            AlbumTrack(card: track.card, liked: track.id.map { likedIDs.contains($0) } ?? false)
+        }
+        completions.append(AlbumCompletion(album: album,
+                                           likedCount: entries.filter { $0.liked }.count,
+                                           total: entries.count,
+                                           tracks: entries))
     }
 }

@@ -148,24 +148,33 @@ struct PlanView: View {
         List {
             statsSection
             if !plan.removals.isEmpty {
-                Section("Remove — \(plan.removals.count) to unlike") {
+                Section {
                     ForEach(plan.removals) { r in
                         CardRow(entryID: r.id, card: r.card, reason: r.reason, accent: .red)
                     }
+                } header: {
+                    SectionHeader(title: "Remove — \(plan.removals.count) to unlike",
+                                  ids: plan.removals.map(\.id))
                 }
             }
             if !plan.replacements.isEmpty {
-                Section("Replace — \(plan.replacements.count) unplayable") {
+                Section {
                     ForEach(plan.replacements) { rep in
                         ReplacementRow(entryID: rep.id, replacement: rep)
                     }
+                } header: {
+                    SectionHeader(title: "Replace — \(plan.replacements.count) unplayable",
+                                  ids: plan.replacements.map(\.id))
                 }
             }
-            if !plan.additions.isEmpty {
-                Section("Add — \(plan.additions.count) to complete albums") {
-                    ForEach(plan.additions) { a in
-                        CardRow(entryID: a.id, card: a.card, reason: a.reason, accent: .green)
+            if !plan.completions.isEmpty {
+                Section {
+                    ForEach(plan.completions) { completion in
+                        AlbumCompletionView(completion: completion)
                     }
+                } header: {
+                    SectionHeader(title: "Add — \(plan.additionsCount) to complete albums",
+                                  ids: plan.completions.flatMap { $0.missing.map(\.id) })
                 }
             }
         }
@@ -191,6 +200,24 @@ struct PlanView: View {
                 }
             }
             .frame(maxWidth: .infinity)
+        }
+    }
+}
+
+struct SectionHeader: View {
+    @EnvironmentObject var model: AppModel
+    let title: String
+    let ids: [UUID]
+
+    var body: some View {
+        HStack {
+            Text(title)
+            Spacer()
+            let allOn = model.allIncluded(ids)
+            Button(allOn ? "Select none" : "Select all") {
+                model.setIncluded(ids, !allOn)
+            }
+            .font(.caption).textCase(nil).buttonStyle(.borderless)
         }
     }
 }
@@ -238,17 +265,71 @@ struct CardRow: View {
     }
 }
 
+// One partially-liked album: cover + ratio header, then the full tracklist with
+// missing tracks tickable and already-liked tracks shown for context.
+struct AlbumCompletionView: View {
+    let completion: Plan.AlbumCompletion
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 10) {
+                Artwork(url: completion.tracks.first?.card.image)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(completion.album).font(.subheadline.bold()).lineLimit(1)
+                    Text("you like \(completion.likedCount) of \(completion.total) — adding the \(completion.missing.count) missing")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+                Spacer()
+            }
+            VStack(spacing: 0) {
+                ForEach(completion.tracks) { AlbumTrackRow(track: $0) }
+            }
+            .padding(.leading, 4)
+        }
+        .padding(.vertical, 4)
+        .listRowBackground(Color.green.opacity(0.045))
+    }
+}
+
+struct AlbumTrackRow: View {
+    @EnvironmentObject var model: AppModel
+    let track: Plan.AlbumTrack
+
+    var body: some View {
+        HStack(spacing: 8) {
+            if track.liked {
+                Image(systemName: "checkmark.circle.fill").foregroundStyle(.green.opacity(0.5))
+                    .help("Already in your library")
+            } else {
+                Toggle("", isOn: model.binding(track.id)).labelsHidden()
+            }
+            if track.card.explicit { ExplicitTag() }
+            Text(track.card.title)
+                .foregroundStyle(track.liked ? .secondary : .primary)
+                .lineLimit(1)
+            Spacer()
+            Text("\(track.card.durationSeconds)s").font(.caption.monospacedDigit()).foregroundStyle(.secondary)
+            SpotifyLink(card: track.card)
+        }
+        .padding(.vertical, 1)
+        .opacity(track.liked ? 1 : (model.included(track.id) ? 1 : 0.45))
+    }
+}
+
 struct ReplacementRow: View {
     @EnvironmentObject var model: AppModel
     let entryID: UUID
     let replacement: Plan.Replacement
 
     var body: some View {
-        HStack(spacing: 10) {
+        HStack(alignment: .top, spacing: 10) {
             Toggle("", isOn: model.binding(entryID)).labelsHidden()
             VStack(alignment: .leading, spacing: 6) {
-                line(card: replacement.dead, symbol: "xmark.circle.fill", color: .red)
-                line(card: replacement.alternative, symbol: "checkmark.circle.fill", color: .green)
+                HStack(spacing: 12) {
+                    column(replacement.dead, symbol: "xmark.circle.fill", color: .red)
+                    Image(systemName: "arrow.right").foregroundStyle(.secondary)
+                    column(replacement.alternative, symbol: "checkmark.circle.fill", color: .green)
+                }
                 Text(replacement.reason).font(.caption).foregroundStyle(.secondary).lineLimit(1)
             }
         }
@@ -257,15 +338,16 @@ struct ReplacementRow: View {
         .listRowBackground(Color.orange.opacity(0.05))
     }
 
-    private func line(card: Card, symbol: String, color: Color) -> some View {
+    private func column(_ card: Card, symbol: String, color: Color) -> some View {
         HStack(spacing: 8) {
             Image(systemName: symbol).foregroundStyle(color)
             Artwork(url: card.image)
             if card.explicit { ExplicitTag() }
-            Text("\(card.artist) — \(card.title)").lineLimit(1)
-            Spacer()
+            Text("\(card.artist) — \(card.title)").lineLimit(2)
+            Spacer(minLength: 4)
             SpotifyLink(card: card)
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 

@@ -43,7 +43,7 @@ public extension Engine {
 
         struct StubLibrary: LibraryProviding {
             var alternative: Track?
-            func albumTracks(_ albumID: String, albumName: String?) async throws -> [Track] { [] }
+            func albumTracks(_ albumID: String, albumName: String?, albumImage: String?) async throws -> [Track] { [] }
             func findAlternative(_ track: Track) async throws -> Track? { alternative }
         }
 

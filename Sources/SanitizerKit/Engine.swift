@@ -46,7 +46,7 @@ public enum Engine {
         analyzer.progress = progress
         let plan = try await analyzer.buildPlan()
         Log.scan("analyzed in \(Log.since(analyzeStart))s "
-                 + "(\(plan.removals.count) remove, \(plan.replacements.count) replace, \(plan.additions.count) add); "
+                 + "(\(plan.removals.count) remove, \(plan.replacements.count) replace, \(plan.additionsCount) add); "
                  + "scan total \(Log.since(started))s")
         return plan
     }
@@ -131,13 +131,19 @@ public extension Engine {
                   alternative: card("alt2", "Santa Esmeralda", "Don't Let Me Be Misunderstood", "House Of The Rising Sun", 628),
                   reason: "unplayable in your market — same recording (ISRC) plays here")
         ]
-        plan.additions = [
-            .init(card: card("add1", "Makaveli", "Hail Mary", "The Don Killuminati", 309, explicit: true),
-                  reason: "you like 9/12 of \"The Don Killuminati\""),
-            .init(card: card("add2", "Makaveli", "To Live & Die in L.A.", "The Don Killuminati", 273, explicit: true),
-                  reason: "you like 9/12 of \"The Don Killuminati\""),
-            .init(card: card("add3", "JAY-Z", "Encore", "The Black Album", 250, explicit: true),
-                  reason: "you like 10/12 of \"The Black Album\"")
+        func entry(_ id: String, _ title: String, _ secs: Int, liked: Bool, play: String = "4cOdK2wGLETKBW3PvgPWqT") -> Plan.AlbumTrack {
+            Plan.AlbumTrack(card: card(id, "Makaveli", title, "The Don Killuminati", secs, explicit: true, play: play), liked: liked)
+        }
+        plan.completions = [
+            Plan.AlbumCompletion(album: "The Don Killuminati: The 7 Day Theory", likedCount: 4, total: 7, tracks: [
+                entry("dk1", "Bomb First (My Second Reply)", 267, liked: true),
+                entry("dk2", "Hail Mary", 309, liked: false, play: "6HZILIRieu8S0iqY8kIKhj"),
+                entry("dk3", "Toss It Up", 304, liked: true),
+                entry("dk4", "To Live & Die in L.A.", 273, liked: false, play: "69kOkLUCkxIZYexIgSG8rq"),
+                entry("dk5", "Hold Ya Head", 250, liked: true),
+                entry("dk6", "Against All Odds", 277, liked: false),
+                entry("dk7", "Life of an Outlaw", 268, liked: true)
+            ])
         ]
         plan.stats = [
             "liked_tracks_scanned": 3331, "duplicates_removed": 166, "unplayable_removed": 52,

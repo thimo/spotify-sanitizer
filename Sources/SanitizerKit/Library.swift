@@ -2,7 +2,7 @@ import Foundation
 
 // What the analyzer needs from a library — extracted so tests can stub it.
 protocol LibraryProviding {
-    func albumTracks(_ albumID: String, albumName: String?) async throws -> [Track]
+    func albumTracks(_ albumID: String, albumName: String?, albumImage: String?) async throws -> [Track]
     func findAlternative(_ track: Track) async throws -> Track?
 }
 
@@ -16,14 +16,15 @@ struct Library: LibraryProviding {
         try await client.eachPage("/me/tracks", ["market": market], onProgress: onProgress).map { Track($0) }
     }
 
-    func albumTracks(_ albumID: String, albumName: String?) async throws -> [Track] {
+    func albumTracks(_ albumID: String, albumName: String?, albumImage: String? = nil) async throws -> [Track] {
         let items = try await client.eachPage("/albums/\(albumID)/tracks", ["market": market])
         return items.map { item in
             // /albums/{id}/tracks items are bare track objects; graft a minimal
-            // album block (with the name) back on so Track can describe itself.
+            // album block (name + cover) back on so Track can describe itself.
             var merged = item
             var album: [String: Any] = ["id": albumID]
             if let albumName { album["name"] = albumName }
+            if let albumImage { album["images"] = [["url": albumImage]] }
             merged["album"] = album
             return Track(merged)
         }

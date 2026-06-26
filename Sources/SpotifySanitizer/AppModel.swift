@@ -40,6 +40,12 @@ final class AppModel: ObservableObject {
 
     func included(_ id: UUID) -> Bool { !excluded.contains(id) }
 
+    func allIncluded(_ ids: [UUID]) -> Bool { ids.allSatisfy { !excluded.contains($0) } }
+
+    func setIncluded(_ ids: [UUID], _ include: Bool) {
+        if include { excluded.subtract(ids) } else { excluded.formUnion(ids) }
+    }
+
     func binding(_ id: UUID) -> Binding<Bool> {
         Binding(get: { [weak self] in self?.included(id) ?? true },
                 set: { [weak self] keep in
@@ -56,7 +62,9 @@ final class AppModel: ObservableObject {
         for rep in plan.replacements where included(rep.id) {
             remove.append(rep.dead.id); add.append(rep.alternative.id)
         }
-        for a in plan.additions where included(a.id) { add.append(a.card.id) }
+        for completion in plan.completions {
+            for track in completion.missing where included(track.id) { add.append(track.card.id) }
+        }
         return (remove, add)
     }
 

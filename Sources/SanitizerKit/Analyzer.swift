@@ -37,7 +37,7 @@ struct Analyzer {
             "duplicates_removed":   plan.removals.filter { $0.reason.hasPrefix("duplicate") }.count,
             "unplayable_removed":   plan.removals.filter { $0.reason.hasPrefix("unplayable") }.count,
             "unplayable_replaced":  plan.replacements.count,
-            "additions_suggested":  plan.additions.count,
+            "additions_suggested":  plan.additionsCount,
             "albums_kept":          Set(kept.compactMap { $0.albumID }).count
         ]
         return plan
@@ -130,24 +130,20 @@ struct Analyzer {
         let fetched = try await boundedMap(candidates, limit: Analyzer.fetchConcurrency, onProgress: { done in
             self.report(ScanProgress(label: "Checking albums", done: done, total: candidates.count))
         }) { (albumID, liked) in
-            (liked, try await library.albumTracks(albumID, albumName: liked[0].albumName))
+            (liked, try await library.albumTracks(albumID, albumName: liked[0].albumName, albumImage: liked[0].imageURL))
         }
 
         // Build the suggestions sequentially (cheap, and keeps plan access simple).
         for (liked, full) in fetched {
-            let likedReal = liked.filter { !$0.isSkit(maxSeconds: options.skitMaxSeconds) }
             let likedIDs = Set(liked.compactMap { $0.id })
-            let missing = full
-                .filter { track in !(track.id.map { likedIDs.contains($0) } ?? false) }
-                .filter { !$0.isSkit(maxSeconds: options.skitMaxSeconds) }
+            // The album's real (non-skit) tracklist, in order.
+            let realTracks = full.filter { !$0.isSkit(maxSeconds: options.skitMaxSeconds) }
+            let likedReal = realTracks.filter { $0.id.map { likedIDs.contains($0) } ?? false }
+            let missing = realTracks.filter { !($0.id.map { likedIDs.contains($0) } ?? false) }
             if missing.isEmpty { continue } // already complete (minus skits)
+            if realTracks.isEmpty || Double(likedReal.count) / Double(realTracks.count) < options.completionThreshold { continue }
 
-            let realTotal = full.filter { !$0.isSkit(maxSeconds: options.skitMaxSeconds) }.count
-            if realTotal == 0 || Double(likedReal.count) / Double(realTotal) < options.completionThreshold { continue }
-
-            for track in missing {
-                plan.add(track, reason: "you like \(likedReal.count)/\(realTotal) of \"\(liked[0].albumName)\"")
-            }
+            plan.addCompletion(album: liked[0].albumName, tracks: realTracks, likedIDs: likedIDs)
         }
     }
 }
