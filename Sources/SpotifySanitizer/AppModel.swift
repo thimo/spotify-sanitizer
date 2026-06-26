@@ -187,6 +187,35 @@ final class AppModel: ObservableObject {
         }
     }
 
+    // MARK: ignore (persist; never suggest again)
+
+    func ignoreRemoval(_ r: Plan.Removal) {
+        Engine.ignore([r.card.id])
+        plan?.removals.removeAll { $0.id == r.id }
+        afterIgnore("Ignored “\(r.card.title)” — won't suggest again.")
+    }
+
+    func ignoreReplacement(_ rep: Plan.Replacement) {
+        Engine.ignore([rep.dead.id])
+        plan?.replacements.removeAll { $0.id == rep.id }
+        afterIgnore("Ignored “\(rep.dead.title)” — won't suggest again.")
+    }
+
+    func ignoreCompletion(_ c: Plan.AlbumCompletion) {
+        Engine.ignore(c.missing.map { $0.card.id })
+        plan?.completions.removeAll { $0.id == c.id }
+        afterIgnore("Ignored “\(c.album)” — won't suggest again.")
+    }
+
+    private func afterIgnore(_ message: String) {
+        notice = message
+        if let plan, !plan.isEmpty {
+            Engine.cachePlan(plan, scannedAt: scannedAt ?? Date())
+        } else {
+            plan = nil; scannedAt = nil; Engine.clearCachedPlan()
+        }
+    }
+
     // Drop the dead track without adding the alternative.
     func unlikeDead(_ replacement: Plan.Replacement) async {
         await perform(replacement.id, remove: [replacement.dead.id], add: [],

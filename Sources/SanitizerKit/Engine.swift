@@ -71,12 +71,19 @@ public enum Engine {
         let analyzeStart = Date()
         var analyzer = Analyzer(tracks: tracks, library: library, options: options)
         analyzer.progress = progress
-        let plan = try await analyzer.buildPlan()
+        var plan = IgnoreList.filter(try await analyzer.buildPlan())
+        // Recompute the counts that ignore-filtering may have changed.
+        plan.stats["duplicates_removed"] = plan.removals.filter { $0.reason.hasPrefix("duplicate") }.count
+        plan.stats["unplayable_removed"] = plan.removals.filter { $0.reason.hasPrefix("unplayable") }.count
+        plan.stats["unplayable_replaced"] = plan.replacements.count
+        plan.stats["additions_suggested"] = plan.additionsCount
         Log.scan("analyzed in \(Log.since(analyzeStart))s "
                  + "(\(plan.removals.count) remove, \(plan.replacements.count) replace, \(plan.additionsCount) add); "
                  + "scan total \(Log.since(started))s")
         return plan
     }
+
+    public static func ignore(_ ids: [String]) { IgnoreList.add(ids) }
 
     // Execute the selected unlikes/likes and return the reversal-log URL.
     @discardableResult

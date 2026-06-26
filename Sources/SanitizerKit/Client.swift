@@ -100,6 +100,7 @@ struct Client {
     }
 
     private func request(_ method: String, url: URL, body: [String: Any]? = nil) async throws -> [String: Any] {
+        await RequestPacer.shared.waitForSlot()
         let token = try await Auth.accessToken()
         var req = URLRequest(url: url)
         req.httpMethod = method

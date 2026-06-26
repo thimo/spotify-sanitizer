@@ -224,7 +224,9 @@ struct PlanView: View {
                                             DuplicateRow(removal: r)
                                         } else {
                                             CardRow(entryID: r.id, card: r.card, reason: "", accent: .red,
-                                                    actionLabel: "Unlike") { await model.doRemoval(r) }
+                                                    actionLabel: "Unlike",
+                                                    onDo: { await model.doRemoval(r) },
+                                                    onIgnore: { model.ignoreRemoval(r) })
                                         }
                                     }
                                 }
@@ -384,6 +386,7 @@ struct CardRow: View {
     let accent: Color
     var actionLabel: String? = nil
     var onDo: (() async -> Void)? = nil
+    var onIgnore: (() -> Void)? = nil
 
     var body: some View {
         HStack(spacing: 10) {
@@ -403,6 +406,7 @@ struct CardRow: View {
             Spacer(minLength: 8)
             Text(card.durationFormatted).font(.callout.monospacedDigit()).foregroundStyle(.secondary)
             SpotifyLink(card: card)
+            if let onIgnore { IgnoreButton(action: onIgnore) }
             if let actionLabel, let onDo {
                 DoButton(id: entryID, label: actionLabel, action: onDo)
             }
@@ -435,6 +439,7 @@ struct AlbumCompletionView: View {
                         .font(.caption).foregroundStyle(.secondary)
                 }
                 Spacer()
+                IgnoreButton { model.ignoreCompletion(completion) }
                 DoButton(id: completion.id, label: "Add (\(selectedCount))", disabled: selectedCount == 0) {
                     await model.doCompletion(completion)
                 }
@@ -499,6 +504,7 @@ struct DuplicateRow: View {
                 }
             }
             Spacer(minLength: 8)
+            IgnoreButton { model.ignoreRemoval(removal) }
             DoButton(id: removal.id, label: "Unlike") { await model.doRemoval(removal) }
         }
         .opacity(model.included(removal.id) ? 1 : 0.4)
@@ -552,6 +558,7 @@ struct ReplacementRow: View {
                 ProgressView().controlSize(.small).frame(width: 120)
             } else {
                 HStack(spacing: 6) {
+                    IgnoreButton { model.ignoreReplacement(replacement) }
                     Button("Unlike") { Task { await model.unlikeDead(replacement) } }
                         .controlSize(.small).disabled(model.workingItem != nil)
                     Button("Replace") { Task { await model.doReplacement(replacement) } }
@@ -611,6 +618,18 @@ struct DoButton: View {
                 .buttonStyle(.bordered).controlSize(.small)
                 .disabled(disabled || model.workingItem != nil)
         }
+    }
+}
+
+// Persistently ignore an item so it's never suggested again.
+struct IgnoreButton: View {
+    @EnvironmentObject var model: AppModel
+    let action: () -> Void
+    var body: some View {
+        Button(action: action) { Image(systemName: "eye.slash") }
+            .buttonStyle(.borderless)
+            .help("Ignore — never suggest this again")
+            .disabled(model.workingItem != nil)
     }
 }
 
