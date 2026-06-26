@@ -89,15 +89,38 @@ struct Analyzer {
         for t in tracks { if let a = t.albumID { albumLikes[a, default: 0] += 1 } }
 
         var kept: [Track] = []
-        for (_, cluster) in Dictionary(grouping: tracks, by: { $0.fuzzyKey }) {
-            guard cluster.count > 1 else { kept.append(cluster[0]); continue }
-            let keeper = cluster.min { rankKey($0, albumLikes) < rankKey($1, albumLikes) }!
-            kept.append(keeper)
-            for loser in cluster where loser.id != keeper.id {
-                plan.remove(loser, reason: duplicateReason(loser, keeper, albumLikes), keeper: keeper)
+        // Group by song (artist+title), then split each group into clusters of
+        // tracks whose durations are close — so 4:47 and 4:49 of the same song
+        // cluster, but a 7-minute live version stays separate.
+        for (_, group) in Dictionary(grouping: tracks, by: { $0.songKey }) {
+            for cluster in Analyzer.durationClusters(group) {
+                guard cluster.count > 1 else { kept.append(cluster[0]); continue }
+                let keeper = cluster.min { rankKey($0, albumLikes) < rankKey($1, albumLikes) }!
+                kept.append(keeper)
+                for loser in cluster where loser.id != keeper.id {
+                    plan.remove(loser, reason: duplicateReason(loser, keeper, albumLikes), keeper: keeper)
+                }
             }
         }
         return kept
+    }
+
+    // Tracks of the same song whose lengths are within this gap are one copy.
+    static let durationToleranceMs = 10_000
+
+    // Split same-song tracks into clusters by duration proximity (sorted, new
+    // cluster when the gap to the previous exceeds the tolerance).
+    static func durationClusters(_ tracks: [Track]) -> [[Track]] {
+        let sorted = tracks.sorted { $0.durationMs < $1.durationMs }
+        var clusters: [[Track]] = []
+        for t in sorted {
+            if let last = clusters.last?.last, t.durationMs - last.durationMs <= durationToleranceMs {
+                clusters[clusters.count - 1].append(t)
+            } else {
+                clusters.append([t])
+            }
+        }
+        return clusters
     }
 
     private func albumAffinity(_ t: Track, _ albumLikes: [String: Int]) -> Int {

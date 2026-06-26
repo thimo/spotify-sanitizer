@@ -96,15 +96,23 @@ struct Track {
         durationMs <= maxSeconds * 1000 || name.matches(Track.skitPattern)
     }
 
-    // Normalized key for fuzzy "same song, different release" clustering.
-    var fuzzyKey: String {
+    // Normalized "same song" key (artist + title, version cruft stripped) —
+    // no duration, so near-identical copies don't split on a bucket boundary.
+    // Dedup pairs this with a duration-proximity pass.
+    var songKey: String {
         var title = name.lowercased()
         title = title.replacingFirst(Track.versionCruft, with: "")
         title = title.replacingAll(Track.nonAlnum, with: " ").trimmingCharacters(in: .whitespaces)
         let artist = primaryArtist.lowercased()
             .replacingAll(Track.nonAlnum, with: " ").trimmingCharacters(in: .whitespaces)
+        return "\(artist)|\(title)"
+    }
+
+    // songKey + a coarse duration bucket — still used for matching ISRC-less
+    // alternatives, where an exact-ish length match is wanted.
+    var fuzzyKey: String {
         let bucket = Int((Double(durationMs) / 5000.0).rounded())
-        return "\(artist)|\(title)|\(bucket)"
+        return "\(songKey)|\(bucket)"
     }
 
     // Display card for the UI / plan serialization.

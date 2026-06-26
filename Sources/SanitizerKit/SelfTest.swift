@@ -74,6 +74,17 @@ public extension Engine {
                                 saved(name: "Classic - 2011 Remaster", addedAt: "2021-01-01T00:00:00Z", id: "remast")])
         check(plan.removals.count == 1, "remaster did not collapse (\(plan.removals.count))")
 
+        // proximity: near-identical durations of the same song collapse to one,
+        // a far-off (e.g. live) length stays separate
+        plan = await buildPlan([
+            saved(name: "Anger", artist: "Oasis", durationMs: 287_000, id: "a"),
+            saved(name: "Anger", artist: "Oasis", durationMs: 289_000, id: "b"),
+            saved(name: "Anger", artist: "Oasis", durationMs: 289_000, id: "c"),
+            saved(name: "Anger", artist: "Oasis", durationMs: 450_000, id: "live")
+        ])
+        check(plan.removals.count == 2, "proximity: 3 near-identical should leave one (2 removed), got \(plan.removals.count)")
+        check(!plan.removals.contains { $0.card.id == "live" }, "proximity: the far-length version should stay")
+
         // dedup keeps the copy from an album you like more of (affinity tie-break)
         plan = await buildPlan([
             saved(name: "Hit", album: "Collected", id: "comp"),   // album "Collected": 1 liked
