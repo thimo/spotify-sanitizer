@@ -107,9 +107,10 @@ public extension Engine {
         // `play` is a real Spotify track id so the open-arrow actually navigates
         // in the demo (the display ids are placeholders). Defaults to a Rickroll.
         func card(_ id: String, _ artist: String, _ title: String, _ album: String,
-                  _ secs: Int, explicit: Bool = false, play: String = "4cOdK2wGLETKBW3PvgPWqT") -> Card {
+                  _ secs: Int, explicit: Bool = false, num: Int? = nil,
+                  play: String = "4cOdK2wGLETKBW3PvgPWqT") -> Card {
             Card(id: id, artist: artist, title: title, album: album, explicit: explicit,
-                 durationMs: secs * 1000,
+                 durationMs: secs * 1000, trackNumber: num,
                  image: "https://picsum.photos/seed/\(id)/100",
                  url: "https://open.spotify.com/track/\(play)",
                  uri: "spotify:track:\(play)")
@@ -131,18 +132,18 @@ public extension Engine {
                   alternative: card("alt2", "Santa Esmeralda", "Don't Let Me Be Misunderstood", "House Of The Rising Sun", 628),
                   reason: "unplayable in your market — same recording (ISRC) plays here")
         ]
-        func entry(_ id: String, _ title: String, _ secs: Int, liked: Bool, play: String = "4cOdK2wGLETKBW3PvgPWqT") -> Plan.AlbumTrack {
-            Plan.AlbumTrack(card: card(id, "Makaveli", title, "The Don Killuminati", secs, explicit: true, play: play), liked: liked)
+        func entry(_ num: Int, _ id: String, _ title: String, _ secs: Int, liked: Bool, play: String = "4cOdK2wGLETKBW3PvgPWqT") -> Plan.AlbumTrack {
+            Plan.AlbumTrack(card: card(id, "Makaveli", title, "The Don Killuminati", secs, explicit: true, num: num, play: play), liked: liked)
         }
         plan.completions = [
             Plan.AlbumCompletion(album: "The Don Killuminati: The 7 Day Theory", likedCount: 4, total: 7, tracks: [
-                entry("dk1", "Bomb First (My Second Reply)", 267, liked: true),
-                entry("dk2", "Hail Mary", 309, liked: false, play: "6HZILIRieu8S0iqY8kIKhj"),
-                entry("dk3", "Toss It Up", 304, liked: true),
-                entry("dk4", "To Live & Die in L.A.", 273, liked: false, play: "69kOkLUCkxIZYexIgSG8rq"),
-                entry("dk5", "Hold Ya Head", 250, liked: true),
-                entry("dk6", "Against All Odds", 277, liked: false),
-                entry("dk7", "Life of an Outlaw", 268, liked: true)
+                entry(1, "dk1", "Bomb First (My Second Reply)", 267, liked: true),
+                entry(2, "dk2", "Hail Mary", 309, liked: false, play: "6HZILIRieu8S0iqY8kIKhj"),
+                entry(3, "dk3", "Toss It Up", 304, liked: true),
+                entry(4, "dk4", "To Live & Die in L.A.", 273, liked: false, play: "69kOkLUCkxIZYexIgSG8rq"),
+                entry(5, "dk5", "Hold Ya Head", 250, liked: true),
+                entry(6, "dk6", "Against All Odds", 277, liked: false),
+                entry(7, "dk7", "Life of an Outlaw", 268, liked: true)
             ])
         ]
         plan.stats = [

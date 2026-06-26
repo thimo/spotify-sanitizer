@@ -205,11 +205,20 @@ struct PlanView: View {
                 }
             }
             if let scannedAt = model.scannedAt {
-                Text("Scanned \(Text(scannedAt, style: .relative)) ago — Scan again to refresh.")
+                Text("Scanned \(Self.scannedAgo(scannedAt)) — Scan again to refresh.")
                     .font(.caption2).foregroundStyle(.secondary)
             }
         }
         .frame(maxWidth: .infinity)
+    }
+
+    // Coarse "time ago" — seconds stop mattering after a minute.
+    static func scannedAgo(_ date: Date) -> String {
+        let s = Int(Date().timeIntervalSince(date))
+        if s < 60 { return "just now" }
+        if s < 3600 { return "\(s / 60) min ago" }
+        if s < 86400 { return "\(s / 3600) hr ago" }
+        return "\(s / 86400) d ago"
     }
 }
 
@@ -325,6 +334,9 @@ struct AlbumTrackRow: View {
             } else {
                 Toggle("", isOn: model.binding(track.id)).labelsHidden()
             }
+            Text(track.card.trackNumber.map(String.init) ?? "")
+                .font(.callout.monospacedDigit()).foregroundStyle(.secondary)
+                .frame(width: 20, alignment: .trailing)
             if track.card.explicit { ExplicitTag() }
             Text(track.card.title)
                 .foregroundStyle(track.liked ? .secondary : .primary)

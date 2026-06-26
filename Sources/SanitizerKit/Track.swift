@@ -32,6 +32,7 @@ struct Track {
     let albumType: String?
     let albumTotalTracks: Int
     let durationMs: Int
+    let trackNumber: Int?
     let explicit: Bool
     let isrc: String?
     let playable: Bool
@@ -52,6 +53,7 @@ struct Track {
         albumType = album["album_type"] as? String
         albumTotalTracks = (album["total_tracks"] as? Int) ?? 0
         durationMs = (t["duration_ms"] as? Int) ?? 0
+        trackNumber = t["track_number"] as? Int
         explicit = (t["explicit"] as? Bool) ?? false
         isrc = (t["external_ids"] as? [String: Any])?["isrc"] as? String
         // is_playable only appears when a market is supplied; treat missing as playable.
@@ -112,6 +114,7 @@ struct Track {
              album: albumName,
              explicit: explicit,
              durationMs: durationMs,
+             trackNumber: trackNumber,
              image: imageURL,
              url: spotifyURL,
              uri: uri ?? id.map { "spotify:track:\($0)" })
