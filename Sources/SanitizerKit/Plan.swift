@@ -13,6 +13,14 @@ public struct Card: Codable, Hashable {
     public var uri: String?        // spotify:track:… — opens the desktop app
 
     public var durationSeconds: Int { durationMs / 1000 }
+
+    // Spotify-style M:SS (or H:MM:SS for the rare hour-plus track).
+    public var durationFormatted: String {
+        let s = durationMs / 1000
+        return s >= 3600
+            ? String(format: "%d:%02d:%02d", s / 3600, (s % 3600) / 60, s % 60)
+            : String(format: "%d:%02d", s / 60, s % 60)
+    }
 }
 
 // The reviewable output of a scan: what would be unliked, replaced, and liked,

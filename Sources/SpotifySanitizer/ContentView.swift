@@ -256,7 +256,7 @@ struct CardRow: View {
                 Text(reason).font(.caption).foregroundStyle(.secondary).lineLimit(1)
             }
             Spacer()
-            Text("\(card.durationSeconds)s").font(.caption.monospacedDigit()).foregroundStyle(.secondary)
+            Text(card.durationFormatted).font(.caption.monospacedDigit()).foregroundStyle(.secondary)
             SpotifyLink(card: card)
         }
         .padding(.vertical, 2)
@@ -308,7 +308,7 @@ struct AlbumTrackRow: View {
                 .foregroundStyle(track.liked ? .secondary : .primary)
                 .lineLimit(1)
             Spacer()
-            Text("\(track.card.durationSeconds)s").font(.caption.monospacedDigit()).foregroundStyle(.secondary)
+            Text(track.card.durationFormatted).font(.caption.monospacedDigit()).foregroundStyle(.secondary)
             SpotifyLink(card: track.card)
         }
         .padding(.vertical, 1)
