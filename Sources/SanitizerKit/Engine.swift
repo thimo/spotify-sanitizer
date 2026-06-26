@@ -21,6 +21,19 @@ public enum Engine {
         _ = try await Client().get("/me")
     }
 
+    // Diagnostic: re-like an already-liked track (idempotent, no net change) to
+    // tell a permission/scope problem apart from a transient throttle. Returns a
+    // status string; rethrows the API error (e.g. 403) so the caller can report it.
+    public static func writeTest() async throws -> String {
+        let client = Client()
+        let page = try await client.get("/me/tracks", ["limit": "1"])
+        guard let items = page["items"] as? [[String: Any]],
+              let track = items.first?["track"] as? [String: Any],
+              let id = track["id"] as? String else { return "no liked track to test with" }
+        try await client.put("/me/tracks", ids: [id])   // re-like, idempotent
+        return "write OK — re-liked one already-liked track, no net change"
+    }
+
     // Fetch the library and build a reviewable plan. Read-only.
     public static func scan(
         market: String? = nil,

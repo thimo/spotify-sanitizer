@@ -26,6 +26,31 @@ if args.contains("--selftest") {
 
 guard Engine.loggedIn() else { fail("Not logged in.") }
 
+if args.contains("--login") {
+    do {
+        try await Engine.login()
+        print("Logged in.")
+        exit(0)
+    } catch {
+        fail(error.localizedDescription)
+    }
+}
+
+if args.contains("--write-test") {
+    do {
+        print(try await Engine.writeTest())
+        exit(0)
+    } catch let api as ApiError {
+        if case .http(let code, _) = api, code == 403 {
+            print("WRITE FORBIDDEN (403) — modify is being refused despite the scope.")
+            exit(3)
+        }
+        fail(api.errorDescription ?? "\(api)")
+    } catch {
+        fail(error.localizedDescription)
+    }
+}
+
 if args.contains("--ping") {
     do {
         try await Engine.ping()
