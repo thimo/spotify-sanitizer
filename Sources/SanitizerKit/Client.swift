@@ -33,17 +33,23 @@ struct Client {
         try await request("GET", url: buildURL(path, params))
     }
 
-    // Library-modify endpoints take up to 50 ids per call.
+    // Library writes go to the unified /me/library endpoint with track uris as a
+    // query param (max 40). The old per-type PUT/DELETE /me/tracks save endpoints
+    // are deprecated and return 403 silently, so we don't use `path` here.
     func put(_ path: String, ids: [String]) async throws {
-        for slice in ids.chunked(50) {
-            _ = try await request("PUT", url: buildURL(path), body: ["ids": slice])
+        for slice in ids.chunked(40) {
+            _ = try await request("PUT", url: libraryURL(slice))
         }
     }
 
     func delete(_ path: String, ids: [String]) async throws {
-        for slice in ids.chunked(50) {
-            _ = try await request("DELETE", url: buildURL(path), body: ["ids": slice])
+        for slice in ids.chunked(40) {
+            _ = try await request("DELETE", url: libraryURL(slice))
         }
+    }
+
+    private func libraryURL(_ ids: [String]) -> URL {
+        buildURL("/me/library", ["uris": ids.map { "spotify:track:\($0)" }.joined(separator: ",")])
     }
 
     // Walk a paginated endpoint, collecting every item. Spotify returns either a
