@@ -7,9 +7,10 @@ import Foundation
 actor RequestPacer {
     static let shared = RequestPacer()
 
-    // ~5 requests/second. Conservative on purpose: a full scan is a few hundred
-    // requests and we'd rather it take ~40s than trip a multi-hour ban.
-    private let minInterval: TimeInterval = 0.2
+    // ~2.5 requests/second. Spotify's limit is an undisclosed rolling-30s count
+    // (community estimate ~90/30s); pace well under it so a few-hundred-request
+    // scan (~80s) doesn't trip a multi-hour ban. Slow beats banned.
+    private let minInterval: TimeInterval = 0.4
     private var nextSlot = Date.distantPast
 
     func waitForSlot() async {
