@@ -85,6 +85,14 @@ public extension Engine {
         check(plan.removals.count == 2, "proximity: 3 near-identical should leave one (2 removed), got \(plan.removals.count)")
         check(!plan.removals.contains { $0.card.id == "live" }, "proximity: the far-length version should stay")
 
+        // a live version (live in the album name) isn't merged with the studio
+        // version, even when their lengths are within tolerance
+        plan = await buildPlan([
+            saved(name: "Monkey", artist: "RW", album: "Studio Album", durationMs: 432_000, id: "studio"),
+            saved(name: "Monkey", artist: "RW", album: "Live at Knebworth", durationMs: 440_000, id: "live")
+        ])
+        check(plan.removals.isEmpty, "live vs studio should both be kept, got \(plan.removals.map { $0.card.id })")
+
         // dedup keeps the copy from an album you like more of (affinity tie-break)
         plan = await buildPlan([
             saved(name: "Hit", album: "Collected", id: "comp"),   // album "Collected": 1 liked

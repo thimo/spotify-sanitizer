@@ -98,7 +98,7 @@ struct Analyzer {
         // Group by song (artist+title), then split each group into clusters of
         // tracks whose durations are close — so 4:47 and 4:49 of the same song
         // cluster, but a 7-minute live version stays separate.
-        for (_, group) in Dictionary(grouping: tracks, by: { $0.songKey }) {
+        for (_, group) in Dictionary(grouping: tracks, by: { "\($0.songKey)|\($0.isLive ? "live" : "studio")" }) {
             for cluster in Analyzer.durationClusters(group) {
                 guard cluster.count > 1 else { kept.append(cluster[0]); continue }
                 let keeper = cluster.min { rankKey($0, albumLikes) < rankKey($1, albumLikes) }!

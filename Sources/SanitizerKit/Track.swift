@@ -109,6 +109,11 @@ struct Track {
         durationMs <= maxSeconds * 1000 || name.matches(Track.skitPattern)
     }
 
+    // A live recording (word "live" in the title or album) — kept separate from
+    // the studio version in dedup even when their lengths are close.
+    private static let livePattern = regex(#"\blive\b"#)
+    var isLive: Bool { name.matches(Track.livePattern) || albumName.matches(Track.livePattern) }
+
     // Normalized "same song" key (artist + title, version cruft stripped) —
     // no duration, so near-identical copies don't split on a bucket boundary.
     // Dedup pairs this with a duration-proximity pass.
