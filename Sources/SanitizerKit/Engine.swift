@@ -63,6 +63,7 @@ public enum Engine {
         progress: ((ScanProgress) -> Void)? = nil
     ) async throws -> Plan {
         let started = Date()
+        await RequestPacer.shared.reset()
         let client = Client()
         let library = Library(client: client, market: market ?? "from_token")
 
@@ -92,7 +93,7 @@ public enum Engine {
         plan.stats["additions_suggested"] = plan.additionsCount
         Log.scan("analyzed in \(Log.since(analyzeStart))s "
                  + "(\(plan.removals.count) remove, \(plan.replacements.count) replace, \(plan.additionsCount) add); "
-                 + "scan total \(Log.since(started))s")
+                 + "scan total \(Log.since(started))s, \(await RequestPacer.shared.current()) API requests")
         return plan
     }
 

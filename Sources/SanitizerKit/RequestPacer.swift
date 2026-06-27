@@ -12,12 +12,17 @@ actor RequestPacer {
     // scan (~80s) doesn't trip a multi-hour ban. Slow beats banned.
     private let minInterval: TimeInterval = 0.4
     private var nextSlot = Date.distantPast
+    private(set) var count = 0   // requests since the last reset (per-scan diagnostic)
 
     func waitForSlot() async {
+        count += 1
         let now = Date()
         let slot = max(now, nextSlot)
         nextSlot = slot.addingTimeInterval(minInterval)
         let delay = slot.timeIntervalSince(now)
         if delay > 0 { try? await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000)) }
     }
+
+    func reset() { count = 0 }
+    func current() -> Int { count }
 }

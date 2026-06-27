@@ -13,7 +13,23 @@ struct Library: LibraryProviding {
     var market: String = "from_token"
 
     func likedTracks(onProgress: ((_ done: Int, _ total: Int) -> Void)? = nil) async throws -> [Track] {
-        let items = try await client.pagedConcurrent("/me/tracks", ["market": market], onProgress: onProgress)
+        // One cheap probe (total + most-recent id). If both match the cache, the
+        // library is unchanged since last scan — reuse it instead of refetching
+        // ~67 pages. New likes land first (id changes); unlikes change total.
+        let probe = try await client.get("/me/tracks", ["market": market, "limit": "1"])
+        let total = (probe["total"] as? Int) ?? -1
+        let firstID = ((probe["items"] as? [[String: Any]])?.first?["track"] as? [String: Any])?["id"] as? String
+
+        let items: [[String: Any]]
+        if let cached = LibraryCache.load(), cached.total == total, cached.firstID == firstID {
+            Log.scan("library unchanged — reusing cache (\(cached.items.count) tracks)")
+            onProgress?(cached.items.count, cached.items.count)
+            items = cached.items
+        } else {
+            items = try await client.pagedConcurrent("/me/tracks", ["market": market], onProgress: onProgress)
+            LibraryCache.save(total: total, firstID: firstID, items: items)
+        }
+
         let tracks = items.map { Track($0) }
         // Local files / null-track items have no usable id and can't be acted on
         // by the API; drop them so apply never targets a fabricated id.
@@ -24,7 +40,13 @@ struct Library: LibraryProviding {
     }
 
     func albumTracks(_ albumID: String, albumName: String?, albumImage: String? = nil) async throws -> [Track] {
-        let items = try await client.eachPage("/albums/\(albumID)/tracks", ["market": market])
+        let items: [[String: Any]]
+        if let cached = AlbumCache.load(albumID) {
+            items = cached
+        } else {
+            items = try await client.eachPage("/albums/\(albumID)/tracks", ["market": market])
+            AlbumCache.save(albumID, items)
+        }
         return items.map { item in
             // /albums/{id}/tracks items are bare track objects; graft a minimal
             // album block (name + cover) back on so Track can describe itself.
