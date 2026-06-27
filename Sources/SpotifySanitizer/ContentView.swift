@@ -487,6 +487,7 @@ struct DuplicateAlbumView: View {
                             .font(.caption).foregroundStyle(.secondary)
                     }
                     Spacer(minLength: 8)
+                    AlbumLink(albumID: release.albumID)
                     if isKeep {
                         Text("keep").font(.caption.bold()).foregroundStyle(.green)
                     } else {
@@ -724,6 +725,16 @@ struct IgnoreButton: View {
             .buttonStyle(.borderless)
             .help("Ignore — never suggest this again")
             .disabled(model.workingItem != nil)
+    }
+}
+
+struct AlbumLink: View {
+    let albumID: String
+    var body: some View {
+        if let url = URL(string: "spotify:album:\(albumID)") {
+            Link(destination: url) { Image(systemName: "arrow.up.right.square") }
+                .help("Open album in Spotify")
+        }
     }
 }
 
