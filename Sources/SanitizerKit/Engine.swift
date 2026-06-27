@@ -96,7 +96,11 @@ public enum Engine {
         return plan
     }
 
-    public static func ignore(_ ids: [String]) { IgnoreList.add(ids) }
+    public static func ignore(trackIDs: [String], label: String) {
+        IgnoreList.add(IgnoredEntry(trackIDs: trackIDs, label: label))
+    }
+    public static func ignored() -> [IgnoredEntry] { IgnoreList.entries() }
+    public static func unignore(_ id: UUID) { IgnoreList.remove(id) }
 
     // Execute the selected unlikes/likes and return the reversal-log URL.
     @discardableResult

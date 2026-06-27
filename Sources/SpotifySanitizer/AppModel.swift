@@ -25,6 +25,7 @@ final class AppModel: ObservableObject {
     @Published var workingItem: UUID?         // a single item being applied right now
     @Published var lastLog: URL?
     @Published var scannedAt: Date?           // when the shown plan was built
+    @Published var ignored: [IgnoredEntry] = Engine.ignored()
 
     private let demo = CommandLine.arguments.contains("--demo")
     private let ud = UserDefaults.standard
@@ -224,13 +225,13 @@ final class AppModel: ObservableObject {
     // MARK: ignore (persist; never suggest again)
 
     func ignoreRemoval(_ r: Plan.Removal) {
-        Engine.ignore([r.card.id])
+        Engine.ignore(trackIDs: [r.card.id], label: "\(r.card.artist) — \(r.card.title)")
         plan?.removals.removeAll { $0.id == r.id }
         afterIgnore("Ignored “\(r.card.title)” — won't suggest again.")
     }
 
     func ignoreReplacement(_ rep: Plan.Replacement) {
-        Engine.ignore([rep.dead.id])
+        Engine.ignore(trackIDs: [rep.dead.id], label: "\(rep.dead.artist) — \(rep.dead.title)")
         plan?.replacements.removeAll { $0.id == rep.id }
         afterIgnore("Ignored “\(rep.dead.title)” — won't suggest again.")
     }
@@ -246,18 +247,25 @@ final class AppModel: ObservableObject {
     }
 
     func ignoreAlbumDuplicate(_ dup: Plan.AlbumDuplicate) {
-        Engine.ignore(dup.releases.flatMap { $0.trackIDs })
+        Engine.ignore(trackIDs: dup.releases.flatMap { $0.trackIDs }, label: "\(dup.artist) — \(dup.title)")
         plan?.albumDuplicates.removeAll { $0.id == dup.id }
         afterIgnore("Ignored “\(dup.title)” — won't suggest again.")
     }
 
     func ignoreCompletion(_ c: Plan.AlbumCompletion) {
-        Engine.ignore(c.missing.map { $0.card.id })
+        Engine.ignore(trackIDs: c.missing.map { $0.card.id }, label: "\(c.album) (\(c.missing.count) tracks)")
         plan?.completions.removeAll { $0.id == c.id }
         afterIgnore("Ignored “\(c.album)” — won't suggest again.")
     }
 
+    func unignore(_ entry: IgnoredEntry) {
+        Engine.unignore(entry.id)
+        ignored = Engine.ignored()
+        notice = "Restored “\(entry.label)”."
+    }
+
     private func afterIgnore(_ message: String) {
+        ignored = Engine.ignored()
         notice = message
         if let plan, !plan.isEmpty {
             Engine.cachePlan(plan, scannedAt: scannedAt ?? Date())

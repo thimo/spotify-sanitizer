@@ -172,6 +172,21 @@ struct SettingsView: View {
             } header: {
                 Text("Unplayable tracks").font(.headline).padding(.top, 12)
             }
+            if !model.ignored.isEmpty {
+                Section {
+                    ForEach(model.ignored) { entry in
+                        HStack {
+                            Text(entry.label).lineLimit(1)
+                            Spacer()
+                            Button("Restore") { model.unignore(entry) }
+                                .font(.caption).buttonStyle(.borderless)
+                        }
+                    }
+                } header: {
+                    Text("Ignored (\(model.ignored.count))").font(.headline).padding(.top, 12)
+                }
+            }
+
             Section {
                 HStack {
                     Image(systemName: model.loggedIn ? "checkmark.circle.fill" : "xmark.circle")
