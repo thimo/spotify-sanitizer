@@ -58,7 +58,11 @@ enum Auth {
             .init(name: "scope", value: Config.scopes.joined(separator: " ")),
             .init(name: "code_challenge_method", value: "S256"),
             .init(name: "code_challenge", value: challenge),
-            .init(name: "state", value: state)
+            .init(name: "state", value: state),
+            // Force the consent screen so re-authorizing actually re-grants every
+            // scope (Spotify otherwise silently reuses a prior, possibly narrower
+            // consent — which can leave library-modify ineffective).
+            .init(name: "show_dialog", value: "true")
         ]
         NSWorkspace.shared.open(comps.url!)
 
