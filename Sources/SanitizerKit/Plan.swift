@@ -105,12 +105,10 @@ public struct Plan: Codable {
     mutating func replace(_ dead: Track, with alternative: Track, reason: String, fuzzy: Bool = false) {
         replacements.append(Replacement(dead: dead.card, alternative: alternative.card, reason: reason, fuzzy: fuzzy))
     }
-    // `tracks` is the full non-skit album tracklist in order; `likedIDs` flags
-    // which are already in the library.
-    mutating func addCompletion(album: String, tracks: [Track], likedIDs: Set<String>) {
-        let entries = tracks.map { track in
-            AlbumTrack(card: track.card, liked: track.id.map { likedIDs.contains($0) } ?? false)
-        }
+    // `tracks` is the album's playable, non-skit tracklist in order, each paired
+    // with whether it's already in the library.
+    mutating func addCompletion(album: String, tracks: [(Track, Bool)]) {
+        let entries = tracks.map { AlbumTrack(card: $0.0.card, liked: $0.1) }
         completions.append(AlbumCompletion(album: album,
                                            likedCount: entries.filter { $0.liked }.count,
                                            total: entries.count,

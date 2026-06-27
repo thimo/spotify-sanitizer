@@ -207,15 +207,23 @@ struct Analyzer {
 
         // Build the suggestions sequentially (cheap, and keeps plan access simple).
         for (liked, full) in fetched {
-            let likedIDs = Set(liked.compactMap { $0.id })
-            // The album's real (non-skit) tracklist, in order.
-            let realTracks = full.filter { !$0.isSkit(maxSeconds: options.skitMaxSeconds) }
-            let likedReal = realTracks.filter { $0.id.map { likedIDs.contains($0) } ?? false }
-            let missing = realTracks.filter { !($0.id.map { likedIDs.contains($0) } ?? false) }
-            if missing.isEmpty { continue } // already complete (minus skits)
-            if realTracks.isEmpty || Double(likedReal.count) / Double(realTracks.count) < options.completionThreshold { continue }
+            // Match by position (disc + track number), not raw id: Spotify's
+            // relinking can change a track's id between the album tracklist and
+            // your saved tracks, which made already-added tracks look missing.
+            let likedKeys = Set(liked.map { Self.positionKey($0) })
+            // Only playable, non-skit tracks: unplayable ones can't be usefully
+            // added (they'd just get flagged for removal), so don't suggest them.
+            let realTracks = full.filter { $0.playable && !$0.isSkit(maxSeconds: options.skitMaxSeconds) }
+            let paired = realTracks.map { ($0, likedKeys.contains(Self.positionKey($0))) }
+            let likedCount = paired.filter { $0.1 }.count
+            let missingCount = paired.count - likedCount
+            if missingCount == 0 { continue } // already complete (minus skits/unplayable)
+            if paired.isEmpty || Double(likedCount) / Double(paired.count) < options.completionThreshold { continue }
 
-            plan.addCompletion(album: liked[0].albumName, tracks: realTracks, likedIDs: likedIDs)
+            plan.addCompletion(album: liked[0].albumName, tracks: paired)
         }
     }
+
+    // Position within an album, stable across relinking.
+    private static func positionKey(_ t: Track) -> String { "\(t.discNumber ?? 1)-\(t.trackNumber ?? 0)" }
 }

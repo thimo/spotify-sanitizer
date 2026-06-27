@@ -171,9 +171,28 @@ final class AppModel: ObservableObject {
                 self.lastLog = try await Engine.apply(removeIDs: ids.remove, addIDs: ids.add)
             }
             self.notice = "Applied: \(ids.remove.count) unliked, \(ids.add.count) liked."
-            self.plan = nil
-            self.scannedAt = nil
-            Engine.clearCachedPlan()   // the plan no longer matches the library
+            self.pruneApplied()   // keep the items you deselected
+        }
+    }
+
+    // Remove from the plan only what was just applied (selected/included),
+    // leaving deselected items in place so the overview isn't wiped.
+    private func pruneApplied() {
+        guard var plan else { return }
+        plan.removals.removeAll { included($0.id) }
+        plan.replacements.removeAll { included($0.id) }
+        plan.albumDuplicates.removeAll()   // always applied as a unit (no toggle)
+        plan.completions = plan.completions.compactMap { completion in
+            var c = completion
+            c.tracks.removeAll { !$0.liked && included($0.id) }   // applied missing tracks
+            c.likedCount = c.tracks.filter { $0.liked }.count
+            c.total = c.tracks.count
+            return c.missing.isEmpty ? nil : c
+        }
+        if plan.isEmpty {
+            self.plan = nil; scannedAt = nil; Engine.clearCachedPlan()
+        } else {
+            self.plan = plan; Engine.cachePlan(plan, scannedAt: scannedAt ?? Date())
         }
     }
 
