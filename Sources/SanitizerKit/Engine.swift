@@ -38,6 +38,19 @@ public enum Engine {
         return "write OK — re-liked one already-liked track, no net change"
     }
 
+    // Diagnostic: unlike one liked track then immediately re-like it, to confirm
+    // DELETE works on /me/library. Net-zero (re-like is confirmed working).
+    public static func deleteTest() async throws -> String {
+        let client = Client()
+        let page = try await client.get("/me/tracks", ["limit": "1"])
+        guard let track = (page["items"] as? [[String: Any]])?.first?["track"] as? [String: Any],
+              let id = track["id"] as? String else { return "no liked track to test with" }
+        let name = (track["name"] as? String) ?? id
+        try await client.delete("/me/tracks", ids: [id])   // unlike
+        try await client.put("/me/tracks", ids: [id])      // re-like (restore)
+        return "delete round-trip OK — unliked then re-liked “\(name)”, no net change"
+    }
+
     // Fetch the library and build a reviewable plan. Read-only.
     public static func scan(
         market: String? = nil,

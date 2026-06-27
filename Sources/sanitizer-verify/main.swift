@@ -36,6 +36,17 @@ if args.contains("--login") {
     }
 }
 
+if args.contains("--delete-test") {
+    do {
+        print(try await Engine.deleteTest())
+        exit(0)
+    } catch let api as ApiError {
+        fail(api.errorDescription ?? "\(api)")
+    } catch {
+        fail(error.localizedDescription)
+    }
+}
+
 if args.contains("--write-test") {
     do {
         print(try await Engine.writeTest())
