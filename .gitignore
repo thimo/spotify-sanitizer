@@ -1,5 +1,6 @@
 # Swift / SPM build output
 .build/
+/build/
 *.xcodeproj
 .swiftpm/
 *.app/
